@@ -3,6 +3,14 @@ from numba import jit
 
 @jit(nopython=True)
 def C_(gamma, phi, z):
+    """
+    C constant (00 element of the Gaussian transformation matrix)
+
+    Arguments:
+        gamma (complex): displacement parameter
+        phi (float): phase rotation parameter
+        z (complex): squeezing parameter
+    """
     r = np.abs(z)
     delta = np.angle(z)
     
@@ -30,12 +38,21 @@ def dC_(gamma, phi, zeta):
 
 @jit(nopython=True)
 def mu_(gamma, phi, zeta):
+    """
+    Mu vector
+
+    Arguments:
+        gamma (complex): displacement parameter
+        phi (float): phase rotation parameter
+        zeta (complex): squeezing parameter
+    """
     r = np.abs(zeta)
     delta = np.angle(zeta)
     return np.array([np.conj(gamma)*np.exp(1j*(2*phi+delta))*np.tanh(r) + gamma, -np.conj(gamma)*np.exp(1j*phi)/np.cosh(r)])
 
 @jit(nopython=True)
 def dmu_(gamma, phi, zeta):
+
     r = np.abs(zeta)
     delta = np.angle(zeta)
     dmu_dgamma = np.array([1.0, 0.0], dtype=np.complex128)
@@ -54,6 +71,14 @@ def dmu_(gamma, phi, zeta):
     
 @jit(nopython=True)
 def Sigma_(gamma, phi, zeta):
+    """
+    Sigma matrix
+
+    Arguments:
+        gamma (complex): displacement parameter
+        phi (float): phase rotation parameter
+        zeta (complex): squeezing parameter
+    """
     r = np.abs(zeta)
     delta = np.angle(zeta)
     
@@ -86,7 +111,16 @@ def dSigma_(gamma, phi, zeta):
 @jit(nopython = True)
 def new_state(gamma, phi, z, old_state):
     """
-    Directly constructs the transformed state recursively.
+    Directly constructs the transformed state recursively and exactly.
+
+    Arguments:
+        gamma (complex): displacement parameter
+        phi (float): phase rotation parameter
+        z (complex): squeezing parameter
+        old_state (np.array(complex)): State to be transformed
+
+    Returns:
+        (np.array(complex)): the transformed state
     """
     C = C_(gamma, phi, z)
     mu = mu_(gamma, phi, z)
@@ -122,7 +156,18 @@ def new_state(gamma, phi, z, old_state):
 def approx_new_state(gamma, phi, z, old_state, order = None):
     """
     Constructs the transformed state recursively and exactly
-    up to the Nth Fock amplitude, indicated by the keyword argument `order`.
+    up to the Nth Fock amplitude, indicated by the keyword argument `order`
+
+    Arguments:
+        gamma (complex): displacement parameter
+        phi (float): phase rotation parameter
+        z (complex): squeezing parameter
+        old_state (np.array(complex)): State to be transformed
+        order (int): Fock space dimensionality of the exact approximation
+
+    Returns:
+        (np.array(complex)): the new state which is exact up to dimension `order`
+
     """
     C = C_(gamma, phi, z)
     mu = mu_(gamma, phi, z)
@@ -157,7 +202,17 @@ def approx_new_state(gamma, phi, z, old_state, order = None):
 @jit(nopython = True)
 def G_matrix(gamma, phi, zeta, cutoff, dtype=np.complex128):
     """
-    Constructs the Gaussian transformation recursively.
+    Constructs the Gaussian transformation recursively
+
+    Arguments:
+        gamma (complex): displacement parameter
+        phi (float): phase rotation parameter
+        zeta (complex): squeezing parameter
+        cutoff (int): Fock space cutoff dimension
+        dtype (numpy dtype): dtype of the output
+
+    Returns:
+        G (np.array(complex)): the single-mode Gaussian transformation matrix
     """
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
     G = np.zeros((cutoff, cutoff), dtype=dtype)
@@ -181,7 +236,17 @@ def G_matrix(gamma, phi, zeta, cutoff, dtype=np.complex128):
 @jit(nopython = True)
 def RG(C, mu, Sigma, old_state):
     """
-    Directly constructs the transformed state recursively.
+    Constructs the R and G matrices
+    
+    Arguments:
+        C (complex): C constant
+        mu (np.array(complex)): mu vector
+        Sigma (np.array(complex)): Sigma matrix
+        old_state (np.array(complex)): input state
+
+    Returns:
+        R, G (np.array(complex), np.array(complex)): The R and G matrices
+
     """
     
     cutoff = old_state.shape[0]
