@@ -59,8 +59,8 @@ def mu_(gamma, W, zeta, V):
     r = np.abs(zeta)
     delta = np.angle(zeta)
     mu = np.zeros(4,dtype = np.complex128)
-    mu[:2] = np.dot(np.conj(gamma).T,(W*np.diag(np.exp(1j*delta)*np.tanh(r))*W.T)) + np.conj(gamma)
-    mu[2:] = -np.dot(np.conj(gamma).T,(W*np.diag(1/np.cosh(r))*V)) 
+    mu[0],mu[2] = np.dot(np.conj(gamma).T,(W*np.diag(np.exp(1j*delta)*np.tanh(r))*W.T)) + np.conj(gamma)
+    mu[1],mu[3] = -np.dot(np.conj(gamma).T,(W*np.diag(1/np.cosh(r))*V)) 
     return mu
 
 
@@ -77,9 +77,17 @@ def Sigma_(W, zeta, V):
     """
     r = np.abs(zeta)
     delta = np.angle(zeta)
+    M1 = -W*np.diag(np.exp(1j*delta)*np.tanh(r))*W.T
+    M2 = W*np.diag(1/np.cosh(r))*V
+    M3 = V.T*np.diag(1/np.cosh(r))*W.T
+    M4 = V.T*np.diag(np.exp(-1j*delta)*np.tanh(r))*V
+    W1 = np.array([[M1[0,0],M2[0,0]],[M3[0,0],M4[0,0]]])
+    W2 = np.array([[M1[0,1],M2[0,1]],[M3[0,1],M4[0,1]]])
+    W3 = np.array([[M1[1,0],M2[1,0]],[M3[1,0],M4[1,0]]])
+    W4 = np.array([[M1[1,1],M2[1,1]],[M3[1,1],M4[1,1]]])
     
-    return np.concatenate((np.concatenate( (W*np.diag(np.exp(1j*delta)*np.tanh(r))*W.T, -W*np.diag(1/np.cosh(r))*V),axis=1),
-                     np.concatenate((-V.T*np.diag(1/np.cosh(r))*W.T, -V.T*np.diag(np.exp(-1j*delta)*np.tanh(r))*V),axis=1)))
+    return np.concatenate((np.concatenate( (W1, W2),axis=1),
+                     np.concatenate((W3,W4),axis=1)))
 
 @jit(nopython=True)
 def new_state(gamma, phi, theta1, psi1, zeta, theta, psi, old_state):
