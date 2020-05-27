@@ -43,7 +43,7 @@ def C_(gamma, W, zeta, V):
     r = np.abs(zeta)
     delta = np.angle(zeta)
 
-    return np.exp(-0.5*np.sum(np.abs(gamma)**2) + np.dot(np.dot(np.conj(gamma).T,(W*np.diag(np.exp(1j*delta)*np.tanh(r))*W.T)),np.conj(gamma))) / np.sqrt(np.cosh(r)[0]*np.cosh(r)[1])
+    return np.exp(-0.5*np.sum(np.abs(gamma)**2) - np.dot(np.dot(np.conj(gamma).T,(W*np.diag(np.exp(1j*delta)*np.tanh(r))*W.T)),np.conj(gamma))) / np.sqrt(np.cosh(r)[0]*np.cosh(r)[1])
 
 @jit(nopython=True)
 def mu_(gamma, W, zeta, V):
@@ -77,9 +77,14 @@ def Sigma_(W, zeta, V):
     """
     r = np.abs(zeta)
     delta = np.angle(zeta)
+    W1 = W*np.diag(np.exp(1j*delta)*np.tanh(r))*W.T
+    W2 = -W*np.diag(1/np.cosh(r))*V
+    W3 = -V.T*np.diag(1/np.cosh(r))*W.T
+    W4 = -V.T*np.diag(np.exp(-1j*delta)*np.tanh(r))*V
+
     
-    return np.concatenate((np.concatenate( (W*np.diag(np.exp(1j*delta)*np.tanh(r))*W.T, -W*np.diag(1/np.cosh(r))*V),axis=1),
-                     np.concatenate((-V.T*np.diag(1/np.cosh(r))*W.T, -V.T*np.diag(np.exp(-1j*delta)*np.tanh(r))*V),axis=1)))
+    return np.concatenate((np.concatenate( (W1,W2) ,axis=1),
+                     np.concatenate((W3, W4),axis=1)))
 
 @jit(nopython=True)
 def new_state(gamma, phi, theta1, psi1, zeta, theta, psi, old_state):
@@ -192,32 +197,95 @@ def G_matrix(gamma, phi, theta1, psi1, zeta, theta, psi,cutoff):
     G = np.zeros((cutoff, cutoff, cutoff, cutoff),dtype=np.complex128)
     
     
-    #G_0000
+
     G[0,0,0,0] = C
     
-    #G_000q
+
     for q in range(1, cutoff):
         G[0,0,0,q] = mu[3]/sqrt[q]*G[0,0,0,q-1] - Sigma[3,3]*sqrt[q-1]/sqrt[q]*G[0,0,0,q-2]
 
 
-    for p in range(1,cutoff):
-        for q in range(cutoff):
+    for q in range(0,cutoff):
+        for p in range(1,cutoff):
             G[0,0,p,q] = mu[2]/sqrt[p]*G[0,0,p-1,q] - Sigma[2,2]*sqrt[p-1]/sqrt[p]*G[0,0,p-2,q] - Sigma[2,3]*sqrt[q]/sqrt[p]*G[0,0,p-1,q-1]
 
-    for n in range(1,cutoff):
-        for p in range(cutoff):
-            for q in range(cutoff):
+    for q in range(0,cutoff):
+        for p in range(0,cutoff):
+            for n in range(1,cutoff):
                 G[0,n,p,q] = mu[1]/sqrt[n]*G[0,n-1,p,q] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*G[0,n-2,p,q] - Sigma[1,2]/sqrt[n]*sqrt[p]*G[0,n-1,p-1,q] - Sigma[1,3]/sqrt[n]*sqrt[q]*G[0,n-1,p,q-1]
+                
+
+    for q in range(0,cutoff):
+        for p in range(0,cutoff):
+            for n in range(0,cutoff):
+                for m in range(1,cutoff):
+                    G[m,n,p,q] = mu[0]/sqrt[m]*G[m-1,n,p,q] - Sigma[0,0]/sqrt[m]*sqrt[m-1]*G[m-2,n,p,q] - Sigma[0,1]*sqrt[n]/sqrt[m]*G[m-1,n-1,p,q] - Sigma[0,2]*sqrt[p]/sqrt[m]*G[m-1,n,p-1,q] - Sigma[0,3]*sqrt[q]/sqrt[m]*G[m-1,n,p,q-1]
+                    
+    return G,Sigma,mu,W,V
+
+@jit(nopython=True)
+def G_matrix2(gamma, phi, theta1, psi1, zeta, theta, psi,cutoff):
+    """
+    Directly constructs the transformation G matrix recursively and exactly.
+    #Using a different index order with G_matrix.#
+
+    Arguments:
+        gamma (complex np.array): displacement parameter
+        phi (float np.array): phase rotation parameter
+        
+        theta1(float): transmissivity angle of the beamsplitter1
+        psi1(float): reflection phase of the beamsplitter1
+        
+        zeta (complex np.array): squeezing parameter
+        
+        theta(float): transmissivity angle of the beamsplitter
+        psi(float): reflection phase of the beamsplitter
+
+    Returns:
+        (np.array(complex)): the transformation matrix G
+    """
+    
+    W = UW_(phi,theta1,psi1)
+    V = UV_(theta,psi)
+    
+    C = C_(gamma, W, zeta, V)
+    mu = mu_(gamma, W, zeta, V)
+    Sigma = Sigma_( W, zeta, V)
+
+
+    sqrt = np.sqrt(np.arange(cutoff))
+
+
+    G = np.zeros((cutoff, cutoff, cutoff, cutoff),dtype=np.complex128)
+    
+    
+    #G_0000
+    G[0,0,0,0] = C
+    
+    #G_000q
+    for m in range(1, cutoff):
+        G[m,0,0,0] = (mu[0]*G[m-1,0,0,0] - Sigma[0,0]*sqrt[m-1]*G[m-2,0,0,0] )/sqrt[m]
+
+
+    for m in range(0,cutoff):
+        for n in range(1,cutoff):        
+            G[m,n,0,0] = (mu[1]*G[m,n-1,0,0] - Sigma[1,0]*sqrt[m]*G[m-1,n-1,0,0] - Sigma[1,1]*sqrt[n-1]*G[m,n-2,0,0])/sqrt[n]
+
+    for m in range(0,cutoff):
+        for n in range(0,cutoff):
+            for p in range(1,cutoff):
+                G[m,n,p,0] = (mu[2]*G[m,n,p-1,0] - Sigma[2,0]*sqrt[m]*G[m-1,n,p-1,0] - Sigma[2,1]*sqrt[n-1]*G[m,n-1,p-1,0] - Sigma[2,2]*sqrt[p-1]*G[m,n,p-2,0] )/sqrt[p]
                 
                 
     #G_mn^jk
-    for m in range(1,cutoff):
-        for n in range(cutoff):
-            for p in range(cutoff):
-                for q in range(cutoff):
-                    G[m,n,p,q] = mu[0]/sqrt[m]*G[m-1,n,p,q] - Sigma[0,0]/sqrt[m]*sqrt[m-1]*G[m-2,n,p,q] - Sigma[0,1]*sqrt[n]/sqrt[m]*G[m-1,n-1,p,q] - Sigma[0,2]/sqrt[m]*G[m-1,n,p-1,q] - Sigma[0,3]/sqrt[m]*G[m-1,n,p,q-1]
+    for m in range(0,cutoff):
+        for n in range(0,cutoff):
+            for p in range(0,cutoff):
+                for q in range(1,cutoff):
+                    G[m,n,p,q] =( mu[3]*G[m,n,p,q-1] - Sigma[3,0]*sqrt[m]*G[m-1,n,p,q-1] - Sigma[3,1]*sqrt[n]*G[m,n-1,p,q-1] - Sigma[3,2]*sqrt[p]*G[m,n,p-1,q-1] - Sigma[3,3]*sqrt[q-1]*G[m,n,p,q-2] )/sqrt[q]
                     
-    return G,Sigma,mu
+    return G
+
 
 
 
