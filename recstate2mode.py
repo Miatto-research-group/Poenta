@@ -13,7 +13,7 @@ def UW_(phi,theta1,psi1):
         theta1(float): transmissivity angle of the beamsplitter1
         psi1(float): reflection phase of the beamsplitter1
     """
-    return np.array([[np.exp(1j*phi[0])*np.cos(theta1) , -np.exp(1j*phi[0])*np.exp(-1j*psi1)*np.sin(theta1)],[np.exp(1j*phi[1])*np.exp(1j*psi1)*np.sin(theta1), np.exp(1j*phi[1])*np.cos(theta1)]])
+    return np.array([[np.exp(1j*phi[0])*np.cos(theta1) , -np.exp(1j*phi[0])*np.exp(-1j*psi1)*np.sin(theta1)],[np.exp(1j*phi[1])*np.exp(1j*psi1)*np.sin(theta1), np.exp(1j*phi[1])*np.cos(theta1)]],dtype=np.complex128)
     
     
     
@@ -24,7 +24,7 @@ def UV_(theta,psi):
         theta(float): transmissivity angle of the beamsplitter1
         psi(float): reflection phase of the beamsplitter1
     """
-    return np.array([[np.cos(theta) , -np.exp(-1j*psi)*np.sin(theta)],[np.exp(1j*psi)*np.sin(theta), np.cos(theta)]])
+    return np.array([[np.cos(theta) , -np.exp(-1j*psi)*np.sin(theta)],[np.exp(1j*psi)*np.sin(theta), np.cos(theta)]],dtype=np.complex128)
 
 
 
@@ -75,12 +75,17 @@ def Sigma_(W, zeta, V):
         zeta (complex np.array): squeezing parameter
         V(complex np.array): general multimode passive transformation (BS)
     """
-    r = np.abs(zeta)
-    delta = np.angle(zeta)
-    W1 = W*np.diag(np.exp(1j*delta)*np.tanh(r))*W.T
-    W2 = -W*np.diag(1/np.cosh(r))*V
-    W3 = -V.T*np.diag(1/np.cosh(r))*W.T
-    W4 = -V.T*np.diag(np.exp(-1j*delta)*np.tanh(r))*V
+    r1,r2 = np.abs(zeta)
+    delta1,delta2 = np.angle(zeta)
+    
+    diagtanh = np.array([[np.exp(1j*delta1)*np.tanh(r1),0],[0,np.exp(1j*delta2)*np.tanh(r2)]],dtype=np.complex128)
+    diagtanh_minus = np.array([[np.exp(-1j*delta1)*np.tanh(r1),0],[0,np.exp(-1j*delta2)*np.tanh(r2)]],dtype=np.complex128)
+    diagsech = np.array([[1/np.cosh(r1),0],[0,1/np.cosh(r2)]],dtype=np.complex128)
+    
+    W1 = W@(diagtanh@W.T)
+    W2 = -W@(diagsech@V)
+    W3 = -V.T@(diagsech@W.T)
+    W4 = -V.T@(diagtanh_minus@V)
 
     
     return np.concatenate((np.concatenate( (W1,W2) ,axis=1),
@@ -88,6 +93,7 @@ def Sigma_(W, zeta, V):
 
 @jit(nopython=True)
 def new_state(gamma, phi, theta1, psi1, zeta, theta, psi, old_state):
+    #Edit ing
     """
     Directly constructs the transformed state recursively and exactly.
 
@@ -133,18 +139,18 @@ def new_state(gamma, phi, theta1, psi1, zeta, theta, psi, old_state):
     #G_mn00
     G_mn00[0,0] = C
     for q in range(1, cutoff):
-        G_mn00[0,q] = mu[3]/sqrt[q]*G_mn00[0,q-1] - Sigma[3,3]*sqrt[q-1]/sqrt[q]*G_mn00[0,q-2]
+        G_mn00[0,q] = (mu[3]*G_mn00[0,q-1] - Sigma[3,3]*sqrt[q-1]*G_mn00[0,q-2])/sqrt[q]
 
 
     for p in range(1,cutoff):
-        for q in range(cutoff):
-            G_mn00[p,q] = mu[2]/sqrt[p]*G_mn00[p-1,q] - Sigma[2,2]*sqrt[p-1]/sqrt[p]*G_mn00[p-2,q] - Sigma[2,3]*sqrt[q]/sqrt[p]*G_mn00[p-1,q-1]
+        for q in range(0,cutoff):
+            G_mn00[p,q] = (mu[2]*G_mn00[p-1,q] - Sigma[2,2]*sqrt[p-1]*G_mn00[p-2,q] - Sigma[2,3]*sqrt[q]*G_mn00[p-1,q-1])/sqrt[p]
             
     # R_00^jk = G_mn00 * a^j b^k|old_state>
     for j in range(cutoff):
         for k in range(cutoff):
-            R[0,0,j,k] = np.sum(G_mn00[:cutoff - j,:cutoff - k]@((old_state[j:, k:]*sqrts[ : cutoff-j,:cutoff-k])))
-            
+            R[0,0,j,k] = np.sum(G_mn00[:cutoff - j,:cutoff - k]*((old_state[j:, k:]*sqrts[ : cutoff-j,:cutoff-k])))
+
     #R_0n^jk
     for n in range(1,cutoff):
         for j in range(cutoff):
@@ -221,7 +227,7 @@ def G_matrix(gamma, phi, theta1, psi1, zeta, theta, psi,cutoff):
                 for m in range(1,cutoff):
                     G[m,n,p,q] = mu[0]/sqrt[m]*G[m-1,n,p,q] - Sigma[0,0]/sqrt[m]*sqrt[m-1]*G[m-2,n,p,q] - Sigma[0,1]*sqrt[n]/sqrt[m]*G[m-1,n-1,p,q] - Sigma[0,2]*sqrt[p]/sqrt[m]*G[m-1,n,p-1,q] - Sigma[0,3]*sqrt[q]/sqrt[m]*G[m-1,n,p,q-1]
                     
-    return G,Sigma,mu,W,V
+    return G
 
 @jit(nopython=True)
 def G_matrix2(gamma, phi, theta1, psi1, zeta, theta, psi,cutoff):
