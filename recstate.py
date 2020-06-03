@@ -236,7 +236,7 @@ def G_matrix(gamma, phi, zeta, cutoff, dtype=np.complex128):
 @jit(nopython = True)
 def RG(C, mu, Sigma, old_state):
     """
-    Constructs the R and G matrices
+    Constructs the R and G matrices (here G matrices is not the same as the one above!!)
     
     Arguments:
         C (complex): C constant

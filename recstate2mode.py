@@ -133,35 +133,51 @@ def new_state(gamma, phi, theta1, psi1, zeta, theta, psi, old_state):
 
 
     R = np.zeros((cutoff, cutoff, cutoff+1, cutoff+1), dtype=dtype)
-    G_mn00 = np.zeros((cutoff, cutoff), dtype=dtype)
+    G_00pq = np.zeros((cutoff, cutoff), dtype=dtype)
     
     
     #G_mn00
-    G_mn00[0,0] = C
+    G_00pq[0,0] = C
     for q in range(1, cutoff):
-        G_mn00[0,q] = (mu[3]*G_mn00[0,q-1] - Sigma[3,3]*sqrt[q-1]*G_mn00[0,q-2])/sqrt[q]
+        G_00pq[0,q] = (mu[3]*G_00pq[0,q-1] - Sigma[3,3]*sqrt[q-1]*G_00pq[0,q-2])/sqrt[q]
 
 
     for p in range(1,cutoff):
         for q in range(0,cutoff):
-            G_mn00[p,q] = (mu[2]*G_mn00[p-1,q] - Sigma[2,2]*sqrt[p-1]*G_mn00[p-2,q] - Sigma[2,3]*sqrt[q]*G_mn00[p-1,q-1])/sqrt[p]
-            
-    # R_00^jk = G_mn00 * a^j b^k|old_state>
+            G_00pq[p,q] = (mu[2]*G_00pq[p-1,q] - Sigma[2,2]*sqrt[p-1]*G_00pq[p-2,q] - Sigma[2,3]*sqrt[q]*G_00pq[p-1,q-1])/sqrt[p]
+                    
+    # R_00^jk = a_dagger^j \G_00pq> b^k  * |old_state>
+    a2 = np.zeros((cutoff,cutoff), dtype=dtype)
+    for i in range(cutoff-1):
+        a2[i+1,i] = np.sqrt(i+1)
+    b = np.zeros((cutoff,cutoff), dtype=dtype)
+    for i in range(cutoff-1):
+        b[i,i+1] = np.sqrt(i+1)
+
+
     for j in range(cutoff):
         for k in range(cutoff):
-            R[0,0,j,k] = np.sum(G_mn00[:cutoff - j,:cutoff - k]*((old_state[j:, k:]*sqrts[ : cutoff-j,:cutoff-k])))
+            G_00pq2 = G_00pq
+            for _ in range(j):
+                G_00pq2 = a2@G_00pq2
+            for _ in range(k):
+                G_00pq2 = G_00pq2@b
+            R[0,0,j,k] = np.sum(G_00pq2*old_state)
 
     #R_0n^jk
     for n in range(1,cutoff):
-        for j in range(cutoff):
-            for k in range(cutoff):
-                R[0,n,j,k] = mu[1]/sqrt[n]*R[0,n-1,j,k] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[0,n-2,j,k] - Sigma[1,2]/sqrt[n]*R[0,n-1,j+1,k] - Sigma[1,3]/sqrt[n]*R[0,m-1,j,k+1]
-                
+        for k in range(0,cutoff): 
+            for j in range(0,cutoff):
+                R[0,n,j,k] = mu[1]/sqrt[n]*R[0,n-1,j,k] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[0,n-2,j,k] - Sigma[1,2]/sqrt[n]*R[0,n-1,j+1,k] - Sigma[1,3]/sqrt[n]*R[0,n-1,j,k+1]
+
+
     for m in range(1,cutoff):
-        for n in range(cutoff):
-            for j in range(cutoff - m):
-                for k in range(cutoff-m-j):
+        for n in range(0,cutoff):
+            for j in range(0,cutoff-m):
+                for k in range(0,cutoff-m-j):
                     R[m,n,j,k] = mu[0]/sqrt[m]*R[m-1,n,j,k] - Sigma[0,0]/sqrt[m]*sqrt[m-1]*R[m-2,n,j,k] - Sigma[0,1]*sqrt[n]/sqrt[m]*R[m-1,n-1,j,k] - Sigma[0,2]/sqrt[m]*R[m-1,n,j+1,k] - Sigma[0,3]/sqrt[m]*R[m-1,n,j,k+1]
+
+
                     
     return R[:,:,0,0]
 
