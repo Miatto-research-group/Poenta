@@ -147,9 +147,9 @@ def new_state(gamma, phi, theta1, psi1, zeta, theta, psi, old_state):
             G_00pq[p,q] = (mu[2]*G_00pq[p-1,q] - Sigma[2,2]*sqrt[p-1]*G_00pq[p-2,q] - Sigma[2,3]*sqrt[q]*G_00pq[p-1,q-1])/sqrt[p]
                     
     # R_00^jk = a_dagger^j \G_00pq> b^k  * |old_state>
-    a2 = np.zeros((cutoff,cutoff), dtype=dtype)
+    a = np.zeros((cutoff,cutoff), dtype=dtype)
     for i in range(cutoff-1):
-        a2[i+1,i] = np.sqrt(i+1)
+        a[i+1,i] = np.sqrt(i+1)
     b = np.zeros((cutoff,cutoff), dtype=dtype)
     for i in range(cutoff-1):
         b[i,i+1] = np.sqrt(i+1)
@@ -159,7 +159,7 @@ def new_state(gamma, phi, theta1, psi1, zeta, theta, psi, old_state):
         for k in range(cutoff):
             G_00pq2 = G_00pq
             for _ in range(j):
-                G_00pq2 = a2@G_00pq2
+                G_00pq2 = a@G_00pq2
             for _ in range(k):
                 G_00pq2 = G_00pq2@b
             R[0,0,j,k] = np.sum(G_00pq2*old_state)
