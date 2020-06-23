@@ -49,7 +49,7 @@ def test_Gmatrix(gamma, phi, theta1, psi1, zeta, theta, psi,cutoff):
     gate_bs1 = BSgate(theta1,psi1,cutoff+20)[0]
     Gbs = G_matrix(np.array([0,0],dtype = np.complex128), np.array([0,0],dtype = np.complex128), 0.3, 0.2, np.array([0,0],dtype = np.complex128),0, 0,cutoff)
     Gbs_real = np.transpose(gate_bs1[:cutoff,:cutoff,:cutoff,:cutoff],(0,2,1,3))
-    assert np.allclose(Gbs,Gbs_real,rtol=1e-01, atol=1e-01,), "BS is not right"
+    assert np.allclose(Gbs,Gbs_real,rtol=1e-01, atol=1e-01), "BS is not right"
 
 
     

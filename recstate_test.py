@@ -1,6 +1,11 @@
 import numpy as np
 from recstate import G_matrix,new_state,RG,C_,mu_,Sigma_
 from thewalrus.fock_gradients import Dgate,Sgate,Rgate,Kgate,BSgate
+import strawberryfields as sf
+import tensorflow as tf
+
+
+
 
 def test_C():
     C = C_(0,0,0+0*1j)
@@ -28,11 +33,27 @@ def test_Gmatrix(gamma,phi,zeta,cutoff):
     
 def test_newstate(gamma,phi,zeta,cutoff):
     state = np.random.rand(cutoff) + 1.0j*np.random.rand(cutoff)
-    state /= np.linalg.norm(state)
+    state = state / np.linalg.norm(state)
     state_out = new_state(gamma, phi, zeta, state)
     
     G = G_matrix(gamma, phi, zeta, cutoff)
     state_out_real = np.einsum("ab,b->a",G,state)
+    
+    #strawberryfields test
+    eng = sf.Engine('tf', backend_options={'cutoff_dim':cutoff})
+    prog = sf.Program(1)
+    vac = tf.constant(state, dtype=tf.complex64)
+    with prog.context as mode: 
+        sf.ops.Ket(vac) | mode[0]
+
+        sf.ops.Sgate(zeta) | mode[0]
+        sf.ops.Rgate(phi) | mode[0] 
+        sf.ops.Dgate(gamma) | mode[0]
+
+        psi1 = eng.run(prog)
+    assert np.allclose(psi1.state.ket(),state_out_real, atol=1e-01) ,"compare with sf is not ok"
+
+
     assert state_out.all() == state_out_real.all(),"New state is not right"
     
     
