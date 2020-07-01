@@ -81,6 +81,8 @@ def dC_dmu_dSigma(gamma, phi, theta1, varphi1, zeta, theta, varphi, dtype = np.c
     e_ivarphi = np.exp(1j*varphi)
     T1 = np.exp(1j*delta1)*np.tanh(r1)
     T2 = np.exp(1j*delta2)*np.tanh(r2)
+    T1minus = np.exp(-1j*delta1)*np.tanh(r1)
+    T2minus = np.exp(-1j*delta2)*np.tanh(r2)
     
 
     # dC
@@ -122,14 +124,14 @@ def dC_dmu_dSigma(gamma, phi, theta1, varphi1, zeta, theta, varphi, dtype = np.c
     dmu_dgamma2 = np.array([0.0, 1.0, 0.0, 0.0], dtype=dtype)
     dmu_dgamma2c = np.array([e_iphi12*np.sin(theta1)*np.cos(theta1)*(e_ivarphi1*T1-e_ivarphi1**(-1)*T2), e_iphi2**2(T2*np.cos(theta1)**2+e_ivarphi1**2*T1*np.sin(theta1)**2),-e_iphi2(e_ivarphi*np.cos(theta)*np.cos(theta1)*np.sech(r2) + e_ivarphi1*np.sin(theta1)*np.cos(theta)*np.sech(r1)) , e_iphi2(-np.cos(theta)*np.cos(theta1)*np.sech(r2) + e_ivarphi**(-1)*e_ivarphi1*np.sin(theta1)*np.sin(theta)*np.sech(r1))], dtype=dtype)
     
-    dmu_dphi1 = np.array([ , , , ], dtype=dtype)
-    dmu_dphi2 = np.array([ , , , ], dtype=dtype)
+    dmu_dphi1 = np.array([ 2j*e_iphi1**2*gamma1c*(e_ivarphi1**(-2)*T2*np.sin(theta1)**2 + T1*np.cos(theta1)**2) + 1j*gamma2c*np.sin(theta1)*np.cos(theta1)*e_iphi12*(e_ivarphi1*T1-e_ivarphi1**(-1)*T2),1j*gamma1c*np.sin(theta1)*np.cos(theta1)*e_iphi12*(e_ivarphi1*T1-e_ivarphi1**(-1)*T2) , 1j*e_iphi1*gamma1c*(-np.cos(theta)*np.cos(theta1)*np.sech(r1)+e_ivarphi/e_ivarphi1*np.sin(theta)*np.sin(theta1)*np.sech(r2)),1j*e_iphi1*gamma1c*(e_ivarphi1**(-1)*np.sin(theta1)*np.cos(theta)*np.sech(r2)+e_ivarphi**(-1)*np.sin(theta)*np.cos(theta1)*np.sech(r1)) ], dtype=dtype)
+    dmu_dphi2 = np.array([1j*gamma2c*np.sin(theta1)*np.cos(theta1)*e_iphi12*(e_ivarphi1*T1-e_ivarphi1**(-1)*T2) , 2j*e_iphi2**2*gamma2c*(e_ivarphi1**2*T1*np.sin(theta1)**2 + T2*np.cos(theta1)**2) + 1j*gamma1c*np.sin(theta1)*np.cos(theta1)*e_iphi12*(e_ivarphi1*T1-e_ivarphi1**(-1)*T2), -1j*e_iphi2*gamma2c*(e_ivarphi*np.sin(theta)*np.cos(theta1)*np.sech(r2)+e_ivarphi1*np.sin(theta1)*np.cos(theta)*np.sech(r1)) , 1j*e_iphi2*gamma2c*(-np.cos(theta)*np.cos(theta1)*np.sech(r2)+e_ivarphi1/e_ivarphi*np.sin(theta)*np.sin(theta1)*np.sech(r1))], dtype=dtype)
     
-    dmu_dtheta1 = np.array([ , , , ], dtype=dtype)
-    dmu_dvarphi1 = np.array([ , , , ], dtype=dtype)
+    dmu_dtheta1 = np.array([(e_ivarphi1*T1-e_ivarphi1**(-1)*T2)*(e_iphi12*gamma2c*np.cos(2*theta1)-e_iphi1**2/e_ivarphi1*gamma1c*np.sin(2*theta1)) , (e_ivarphi1*T1-e_ivarphi1**(-1)*T2)*(e_iphi12*gamma1c*np.cos(2*theta1)+e_iphi2**2*e_ivarphi1*gamm2c*np.sin(2*theta1)), e_iphi1*gamma1c*(np.sin(theta1)*np.cos(theta)*np.sech(r1)+e_ivarphi/e_ivarphi1*np.sin(theta)*np.cos(theta1)*np.sech(r2))+ e_iphi2*gamma2c*(-e_ivarphi*np.sin(theta)*np.sin(theta1)*np.sech(r2) - e_ivarphi1*np.cos(theta)*np.cos(theta1)*np.sech(r1)), np.cos(theta)*np.sech(r2)*(e_iphi2*gamma2c*np.sin(theta1)+e_iphi1/e_ivarphi1*gamma1c*np.cos(theta1))+1/e_ivarphi*np.sin(theta)*np.sech(r1)*(-e_iphi1*gamma1c*np.sin(theta1)+e_iphi2*e_ivarphi1*gamma2c*np.cos(theta1))], dtype=dtype)
+    dmu_dvarphi1 = np.array([1j*np.sin(theta1)*(e_iphi12*(e_ivarphi1*T1+e_ivarphi1**(-1)*T2)*gamma2c*np.cos(theta1)-2*e_iphi1**2*e_ivarphi1**(-2)*T2*gamma1c*np.sin(theta1)) , 1j*np.sin(theta1)*(e_iphi12*(e_ivarphi1*T1+e_ivarphi1**(-1)*T2)*gamma1c*np.cos(theta1)+2*e_iphi1**2*e_ivarphi1**2*T1*gamma2c*np.sin(theta1)), -1j*np.sin(theta1)*(e_iphi2*e_ivarphi1*gamma2c*np.cos(theta)*np.sech(r1)+e_iphi1*e_ivarphi/e_ivarphi1*gamma1c*np.sin(theta)*np.sech(r2)), 1j*np.sin(theta1)*(e_iphi2*e_ivarphi1/e_ivarphi*gamma2c*np.sin(theta)*np.sech(r1) - e_iphi1/e_ivarphi1*gamma1c*np.cos(theta)*np.sech(r2))], dtype=dtype)
     
-    dmu_dr1 = np.array([ , , , ], dtype=dtype)
-    dmu_ddelta1 = np.array([ , , , ], dtype=dtype)
+    dmu_dr1 = np.array([ np.sech(r1)**2*np.exp(1j*delta1)*(gamma1c*e_iphi1**2*np.cos(theta1)**2+gamma2c*e_iphi12*e_ivarphi1*np.sin(theta1)*np.cos(theta1)), np.sech(r1)**2*np.exp(1j*delta1)*(gamma2c*e_iphi2**2*np.sin(theta1)**2+gamma1c*e_iphi12*e_ivarphi1*np.sin(theta1)*np.cos(theta1)), np.sech(r1)*np.tanh(r1)*np.cos(theta)*(gamma2c*e_iphi2*e_ivarphi1*np.sin(theta1)+gamma1c*e_iphi1*np.cos(theta1)), -np.sech(r1)*np.tanh(r1)/e_ivarphi*np.sin(theta)(gamma1c*e_iphi1*np.cos(theta1)+gamma2c*e_iphi2*e_ivarphi1*np.sin(theta1))], dtype=dtype)
+    dmu_ddelta1 = np.array([ 1j*np.tanh(r1)*np.exp(1j*delta1)*(gamma1c*e_iphi1**2*np.cos(theta1)**2+gamma2c*e_iphi12*e_ivarphi1*np.sin(theta1)*np.cos(theta1)), 1j*np.tanh(r1)*np.exp(1j*delta1)*(gamma2c*e_iphi2**2*e_ivarphi1**2*np.sin(theta1)**2+gamma1c*e_iphi12*e_ivarphi1*np.sin(theta1)*np.cos(theta1)), 0.0, 0.0], dtype=dtype)
     if r > 0.01:
         dmu_ddelta1_over_r = dmu_ddelta/r
     else: # Taylor series for tanh(r)/r
@@ -137,8 +139,8 @@ def dC_dmu_dSigma(gamma, phi, theta1, varphi1, zeta, theta, varphi, dtype = np.c
     dmu_dzeta1 = np.exp(-1j*delta)*(dmu_dr1 - 1j*dmu_ddelta1_over_r)/2
     dmu_dzeta1c = np.exp(1j*delta)*(dmu_dr1 + 1j*dmu_ddelta1_over_r)/2
     
-    dmu_dr2 = np.array([ , , , ], dtype=dtype)
-    dmu_ddelta2 = np.array([ , , , ], dtype=dtype)
+    dmu_dr2 = np.array([ np.sech(r2)**2*np.exp(1j*delta2)*(gamma1c*e_iphi1**2*e_ivarphi1**(-2)*np.sin(theta1)**2 - gamma2c*e_iphi12/e_ivarphi1*np.sin(theta1)*np.cos(theta1)), np.sech(r2)**2*np.exp(1j*delta2)*(gamma2c*e_iphi2**2*np.cos(theta1)**2 - gamma1c*e_iphi12/e_ivarphi1*np.sin(theta1)*np.cos(theta1)), np.sech(r2)*np.tanh(r2)*e_ivarphi*(gamma2c*e_iphi2*np.sin(theta)*np.cos(theta) - gamma1c*e_iphi1/e_ivarphi1*np.sin(theta)*np.sin(theta1)), np.sech(r2)*np.tanh(r2)*np.cos(theta)*(gamma2c*e_iphi2*np.cos(theta1) - gamma1c*e_iphi1/e_ivarphi1*np.sin(theta1))], dtype=dtype)
+    dmu_ddelta2 = np.array([ 1j*np.tanh(r2)*np.exp(1j*delta2)*(gamma1c*e_iphi1**2*e_ivarphi1**(-2)*np.sin(theta1)**2 - gamma2c*e_iphi12/e_ivarphi1*np.sin(theta1)*np.cos(theta1)),  1j*np.tanh(r2)*np.exp(1j*delta2)*(gamma2c*e_iphi2**2*np.cos(theta1)**2 - gamma1c*e_iphi12/e_ivarphi1*np.sin(theta1)*np.cos(theta1)), 0.0, 0.0], dtype=dtype)
     if r > 0.01:
         dmu_ddelta2_over_r = dmu_ddelta/r
     else: # Taylor series for tanh(r)/r
@@ -147,29 +149,53 @@ def dC_dmu_dSigma(gamma, phi, theta1, varphi1, zeta, theta, varphi, dtype = np.c
     dmu_dzeta2c = np.exp(1j*delta)*(dmu_dr2 + 1j*dmu_ddelta2_over_r)/2
     
     
-    dmu_dtheta = np.array([0.0, 0.0, , ], dtype=dtype)
-    dmu_dvarphi = np.array([0.0, 0.0, , ], dtype=dtype)
+    dmu_dtheta = np.array([0.0, 0.0, e_iphi1*gamma1c*(np.sin(theta)*np.cos(theta1)*np.sech(r1)+e_ivarphi/e_ivarphi1*np.sin(theta)*np.sin(theta1)*np.sech(r2))+ e_iphi2*gamma2c*(-e_ivarphi*np.cos(theta)*np.cos(theta1)*np.sech(r2)+e_ivarphi1*np.sin(theta)*np.sin(theta1)*np.sech(r1)), np.sin(theta)*np.sech(r2)*(e_iphi2*gamma2c*np.cos(theta1)-e_iphi1/e_ivarphi1*gamma1c*np.sin(theta1))+1/e_ivarphi*np.cos(theta)*np.sech(r1)*(e_iphi1*gamma1c*np.cos(theta1)+e_iphi2*e_ivarphi1*gamma2c*np.sin(theta1))], dtype=dtype)
+    dmu_dvarphi = np.array([0.0, 0.0, 1j*e_ivarphi*np.sech(r2)*np.sin(theta)*(e_iphi2*gamma2c*np.cos(theta1)-e_iphi1/e_ivarphi1*gamma1c*np.sin(theta1)), -1j/e_ivarphi*np.sech(r1)*np.sin(theta)*(e_iphi1*gamma1c*np.cos(theta1)-e_iphi2*e_ivarphi1*gamma2c*np.sin(theta1))], dtype=dtype)
     
     
     dmu = np.stack((dmu_dgamma1, dmu_dgamma1c, dmu_dgamma2, dmu_dgamma2c, dmu_dphi1, dmu_dphi2, dmu_dtheta1, dmu_dvarphi1, dmu_dzeta1, dmu_dzeata1c, dmu_dzeta2, dmu_dzeata2c, dmu_dtheta, dmu_dvarphi), axis=-1)
 
     # dSigma
-#     dSigma_dgamma = np.array([[0.0, 0.0],[0.0, 0.0]], dtype=np.complex128)
-#     dSigma_dgammac = np.array([[0.0, 0.0],[0.0, 0.0]], dtype=np.complex128)
-#     dSigma_dphi = np.array([[2j*np.exp(1j*(2*phi+delta))*np.tanh(r), -1j*np.exp(1j*phi)/np.cosh(r)],
-#                             [-1j*np.exp(1j*phi)/np.cosh(r), 0.0]])
-#     dSigma_dr = np.array([[np.exp(1j*(2*phi+delta))/np.cosh(r)**2, np.exp(1j*phi)*np.tanh(r)/np.cosh(r)],
-#                           [np.exp(1j*phi)*np.tanh(r)/np.cosh(r), -np.exp(-1j*delta)/np.cosh(r)**2]])
-#     dSigma_ddelta = np.array([[1j*np.exp(1j*(2*phi+delta))*np.tanh(r), 0.0],
-#                               [0.0, 1j*np.exp(-1j*delta)*np.tanh(r)]])
-#     if r > 0.01:
-#         dSigma_ddelta_over_r = dSigma_ddelta/r
-#     else: # Taylor series for tanh(r)/r
-#         dSigma_ddelta_over_r = np.array([[1j*np.exp(1j*(2*phi+delta))*(1 - r**2/3. + 2*r**4/15.), 0.0],
-#                               [0.0, 1j*np.exp(-1j*delta)*(1 - r**2/3. + 2*r**4/15.)]])
-#     dSigma_dz = np.exp(-1j*delta)*(dSigma_dr - 1j*dSigma_ddelta_over_r)
-#     dSigma_dzc = np.exp(1j*delta)*(dSigma_dr + 1j*dSigma_ddelta_over_r)
-#     dSigma = np.stack((dSigma_dgamma, dSigma_dgammac, dSigma_dphi, dSigma_dz, dSigma_dzc), axis=-1)
+    dSigma_dgamma1 = np.array([[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0]], dtype=dtype)
+    dSigma_dgamma1c = np.array([[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0]], dtype=dtype)
+    dSigma_dgamma2 = np.array([[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0]], dtype=dtype)
+    dSigma_dgamma2c = np.array([[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0]], dtype=dtype)
+    
+    dSigma1_phi1 = np.array([[2j*e_iphi1**2*e_ivarphi1**(-2)*(e_ivarphi1**2*T1*np.cos(theta1)**2 + T2*np.sin(theta1)**2), 1j*e_iphi12/e_ivarphi1*(e_ivarphi1*2*T1-T2)*np.sin(theta1)*np.cos(theta1)],[1j*e_iphi12/e_ivarphi1*(e_ivarphi1*2*T1-T2)*np.sin(theta1)*np.cos(theta1), 0.0]], dtype=dtype)
+    dSigma2_phi1 = np.array([[e_iphi1*(np.sin(theta)*np.cos(theta1)*np.sech(r1)+e_ivarphi/e_ivarphi1*np.sin(theta1)*np.cos(theta)*np.sech(r2)),  e_iphi1*(1/e_ivarphi*np.cos(theta)*np.cos(theta1)*np.sech(r1) - 1/e_ivarphi1*np.sin(theta1)*np.sin(theta)*np.sech(r2))],[e_iphi2*(-e_ivarphi*np.cos(theta)*np.cos(theta1)*np.sech(r2) + e_ivarphi1*np.sin(theta1)*np.sin(theta)*np.sech(r1)),  e_iphi2*(np.sin(theta)*np.cos(theta1)*np.sech(r2) + e_ivarphi1/e_ivarphi*np.sin(theta1)*np.cos(theta)*np.sech(r1))]], dtype=dtype)
+    dSigma3_phi1 = -dSigma2_phi1.T
+    dSigma4_phi1 = np.array([[ np.sin(2*theta)*(T1minus-e_ivarphi**2*T2minus), np.cos(2*theta)/e_ivarphi*(T1minus-e_ivarphi**2*T2minus)],[np.cos(2*theta)/e_ivarphi*(T1minus-e_ivarphi**2*T2minus), np.sin(2*theta)*(-np.exp(-2j*delta2)*T1minus+T2minus)]], dtype=dtype)
+    dSigma_phi1 = np.concatenate((np.concatenate( (dSigma1_phi1,dSigma2_phi1) ,axis=1),np.concatenate((dSigma3_phi1, dSigma4_phi1),axis=1))) 
+    
+    
+    dSigma1_phi2 = np.array([[0.0, 1j*e_iphi12/e_ivarphi1*(e_ivarphi1**2*T1-T2)*np.sin(theta1)*np.cos(theta1)],[1j*e_iphi12/e_ivarphi1*(e_ivarphi1**2*T1-T2)*np.sin(theta1)*np.cos(theta1), 2j*e_iphi2**2*e_ivarphi1*(e_ivarphi1**(-2)*T2*np.cos(theta1)**2+T1*np.sin(theta1)**2)]], dtype=dtype)
+    dSigma2_phi2 = np.array([[e_iphi1*(1/e_ivarphi1*np.cos(theta)*np.cos(theta1)*np.sech(r2)-1/e_ivarphi*np.sin(theta1)*np.sin(theta)*np.sech(r1)), e_iphi1*(1/e_ivarphi*np.cos(theta)*np.cos(theta1)*np.sech(r2) - 1/e_ivarphi1*np.sin(theta1)*np.sin(theta)*np.sech(r1))],[e_iphi2*(-1/e_ivarphi1*np.cos(theta)*np.cos(theta1)*np.sech(r1) + e_ivarphi*np.sin(theta1)*np.sin(theta)*np.sech(r2)), e_iphi2*(e_ivarphi1/e_ivarphi*np.sin(theta)*np.cos(theta1)*np.sech(r1) + np.sin(theta1)*np.cos(theta)*np.sech(r2))]], dtype=dtype)
+    dSigma3_phi2 = -dSigma2_phi2.T
+    dSigma4_phi2 = np.array([[0.0, 0.0],[ 0.0, 0.0]], dtype=dtype)
+    dSigma_phi2 = np.concatenate((np.concatenate( (dSigma1_phi2,dSigma2_phi2) ,axis=1),np.concatenate((dSigma3_phi2, dSigma4_phi2),axis=1))) 
+ 
+    dSigma1_theta1 = np.array([[-e_iphi1**2*(T1-e_ivarphi1**(-2)*T2)*np.sin(2*theta1), e_iphi12*(e_ivarphi1*T1-1/e_ivarphi1*T2*np.cos(2*theta1))],[e_iphi12*(e_ivarphi1*T1-1/e_ivarphi1*T2*np.cos(2*theta1)), e_iphi2**2*(e_ivarphi1**2*T1-T2)*np.sin(2*theta1)]], dtype=dtype)
+    dSigma2_theta1 = np.array([[e_iphi1*(e_ivarphi/e_ivarphi1*np.sin(theta)*np.cos(theta1)*np.sech(r2) + np.sin(theta1)*np.cos(theta)*np.sech(r1)), e_iphi1*(1/e_ivarphi1*np.cos(theta)*np.cos(theta1)*np.sech(r2) - 1/e_ivarphi*np.sin(theta)*np.sin(theta1)*np.sech(r1))],[e_iphi2*(-1/e_ivarphi1*np.cos(theta)*np.cos(theta1)*np.sech(r1) + e_ivarphi*np.sin(theta1)*np.sin(theta)*np.sech(r2)), e_iphi2*(np.sin(theta1)*np.cos(theta)*np.sech(r2) + e_ivarphi1/e_ivarphi*np.sin(theta)*np.cos(theta1)*np.sech(r1))]], dtype=dtype)
+    dSigma3_theta1 = -dSigma2_theta1.T
+    dSigma4_theta1 = np.array([[0.0, 0.0],[ 0.0, 0.0]], dtype=dtype)
+    dSigma_theta1 = np.concatenate((np.concatenate( (dSigma1_theta1,dSigma2_theta1) ,axis=1),np.concatenate((dSigma3_theta1, dSigma4_theta1),axis=1))) 
+    
+    
+    #np.array([[],[]], dtype=dtype)
+    dSigma_varphi1 = 
+    
+    dSigma1_theta = np.array([[0.0,0.0],[0.0,0.0]], dtype=dtype)
+    dSigma2_theta = np.array([[e_iphi1*(np.sin(theta1)*np.cos(theta)*np.sech(r1) + e_ivarphi/e_ivarphi1*np.sin(theta)*np.cos(theta1)*np.sech(r2)), e_iphi1*(1/e_ivarphi1*np.cos(theta)*np.cos(theta1)*np.sech(r1) - 1/e_ivarphi*np.sin(theta1)*np.sin(theta)*np.sech(r2))],[e_iphi2*(-e_ivarphi1*np.cos(theta)*np.cos(theta1)*np.sech(r2) + e_ivarphi*np.sin(theta1)*np.sin(theta)*np.sech(r1)), e_iphi2*(np.sin(theta)*np.cos(theta1)*np.sech(r2) + e_ivarphi1/e_ivarphi*np.sin(theta1)*np.cos(theta)*np.sech(r1))]], dtype=dtype)
+    dSigma3_theta = -dSigma2_theta.T
+    dSigma4_theta = np.array([[np.sin(2*theta)*(T1minus-e_ivarphi**2*T2minus),1/e_ivarphi*np.cos(2*theta)*(T1minus-e_ivarphi**2*T2minus)],[1/e_ivarphi*np.cos(2*theta)*(T1minus-e_ivarphi**2*T2minus), np.sin(2*theta)*(-e_ivarphi**(-2)*T1minus+T2minus)]], dtype=dtype)
+    dSigma_theta = np.concatenate((np.concatenate( (dSigma1_theta,dSigma2_theta) ,axis=1),np.concatenate((dSigma3_theta, dSigma4_theta),axis=1)))
+    
+    
+    dSigma_varphi = 
+    
+    
+    
+    dSigma = np.stack((dSigma_dgamma, dSigma_dgammac, dSigma_dphi, dSigma_dz, dSigma_dzc), axis=-1)
 
     return dC, dmu, dSigma
 
