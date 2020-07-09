@@ -2,7 +2,7 @@ import numpy as np
 from numba import jit
 
 @jit(nopython=True)
-def C_mu_Sigma(gamma, phi, z, dtype=np.complex128):
+def C_mu_Sigma(gamma, phi, z):
     """
     Utility function to construct:
     1. C constant
@@ -114,7 +114,7 @@ def R_matrix(gamma, phi, z, old_state):
     """
     cutoff = old_state.shape[0]
     dtype = old_state.dtype
-    C, mu, Sigma = C_mu_Sigma(gamma, phi, z, dtype)
+    C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
 
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
     
@@ -155,7 +155,7 @@ def G_matrix(gamma, phi, z, cutoff, dtype=np.complex128):
         G (complex array[cutoff]): the single-mode Gaussian transformation matrix
     """
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
-    G = np.zeros((cutoff, cutoff), dtype=dtype)
+    G = np.zeros((cutoff, cutoff), dtype=dtype) #maybe numba cannot create array of zeros of type complex64
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
     
     # First column 
