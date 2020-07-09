@@ -15,7 +15,8 @@
 
 import numpy as np
 
-def init_complex(layers:int, scale:float=0.01):
+
+def init_complex(layers: int, scale: float = 0.01):
     """
     Returns the complex initialization values for a given number of layers
 
@@ -26,9 +27,10 @@ def init_complex(layers:int, scale:float=0.01):
     Returns:
         (array[complex]): the vector of random complex initialization values
     """
-    return np.random.normal(scale=scale, size=layers) + 1j*np.random.normal(scale=scale, size=layers)
+    return np.random.normal(scale=scale, size=layers) + 1j * np.random.normal(scale=scale, size=layers)
 
-def init_real(layers:int, scale:float=0.01):
+
+def init_real(layers: int, scale: float = 0.01):
     """
     Returns the real initialization values for a given number of layers
 

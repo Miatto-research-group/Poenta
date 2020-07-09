@@ -16,7 +16,7 @@
 import tensorflow as tf
 import numpy as np
 
-from jitted import G_matrix, grad_newstate, R_matrix
+from .jitted import G_matrix, grad_newstate, R_matrix
 
 
 @tf.custom_gradient
@@ -40,25 +40,24 @@ def GaussianTransformation(gamma, phi, z, Psi):
     z = z.numpy()
     Psi = Psi.numpy()
     cutoff = Psi.shape[0]
-    
+
     R = R_matrix(gamma, phi, z, Psi)
-    Psi_new = R[:,0]
-    
+    Psi_new = R[:, 0]
+
     def grad(dy):
         "Vector-Jacobian products for all the arguments (gamma, phi, z, Psi)"
         G = G_matrix(gamma, phi, z, cutoff, Psi.dtype)
         dPsi_dgamma, dPsi_dgammac, dPsi_dphi, dPsi_dz, dPsi_dzc = grad_newstate(gamma, phi, z, Psi, G[0], R)
-        grad_gammac = tf.reduce_sum(dy*np.conj(dPsi_dgamma) + tf.math.conj(dy)*dPsi_dgammac)
-        grad_phi = 2*tf.math.real(tf.reduce_sum(dy*np.conj(dPsi_dphi)))
-        grad_zc = tf.reduce_sum(dy*np.conj(dPsi_dz) + tf.math.conj(dy)*dPsi_dzc)
+        grad_gammac = tf.reduce_sum(dy * np.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
+        grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * np.conj(dPsi_dphi)))
+        grad_zc = tf.reduce_sum(dy * np.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
         grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)
         return grad_gammac, grad_phi, grad_zc, grad_Psic
-    
+
     return Psi_new, grad
 
 
-
-def kerr(k, cutoff:int, dtype:tf.dtypes.DType):
+def kerr(k, cutoff: int, dtype: tf.dtypes.DType):
     """
     Returns the diagonal of the single-mode Kerr matrix
 
@@ -66,9 +65,5 @@ def kerr(k, cutoff:int, dtype:tf.dtypes.DType):
         cutoff (int): the cutoff dimension of Fock space
         dtype (tf dtype): either tf.complex64 or tf.complex128
     """
-    diag = tf.exp(1j*tf.cast(k, dtype=dtype)*np.arange(cutoff)**2)
+    diag = tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff) ** 2)
     return diag
-
-
-
-

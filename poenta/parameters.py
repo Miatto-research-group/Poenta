@@ -17,7 +17,8 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 
-from nputils import init_complex, init_real
+from .nputils import init_complex, init_real
+
 
 class Parameters:
     """
@@ -26,7 +27,7 @@ class Parameters:
     As an example, the `Circuit` class contains an instance of `Parameters`.
     """
 
-    def __init__(self, num_layers:int, dtype:tf.dtypes.DType = tf.complex64):
+    def __init__(self, num_layers: int, dtype: tf.dtypes.DType = tf.complex64):
         """
         Arguments:
             num_layers (int): number of layers in the circuit
@@ -39,33 +40,34 @@ class Parameters:
             self.complextype = tf.complex64
             self.realtype = tf.float32
         else:
-            raise ValueError(f'dtype can be only tf.complex128 or tf.complex64, not {dtype}')
+            raise ValueError(f"dtype can be only tf.complex128 or tf.complex64, not {dtype}")
 
-        self.gamma = tf.Variable(init_complex(num_layers, 0.01), dtype=self.complextype, name=f'gamma')
-        self.phi = tf.Variable(init_real(num_layers, 0.01), dtype=self.realtype, name=f'phi')
-        self.zeta = tf.Variable(init_complex(num_layers, 0.01), dtype=self.complextype, name=f'zeta')
-        self.kappa = tf.Variable(init_real(num_layers, 0.01), dtype=self.realtype, name=f'kappa')
+        self.gamma = tf.Variable(init_complex(num_layers, 0.01), dtype=self.complextype, name=f"gamma")
+        self.phi = tf.Variable(init_real(num_layers, 0.01), dtype=self.realtype, name=f"phi")
+        self.zeta = tf.Variable(init_complex(num_layers, 0.01), dtype=self.complextype, name=f"zeta")
+        self.kappa = tf.Variable(init_real(num_layers, 0.01), dtype=self.realtype, name=f"kappa")
 
-        self._history:dict = {'gamma':[self.gamma.numpy()], 
-                            'phi':[self.phi.numpy()],
-                            'zeta':[self.zeta.numpy()],
-                            'kappa':[self.kappa.numpy()]}
+        self._history: dict = {
+            "gamma": [self.gamma.numpy()],
+            "phi": [self.phi.numpy()],
+            "zeta": [self.zeta.numpy()],
+            "kappa": [self.kappa.numpy()],
+        }
 
     @property
     def learnable(self):
         return [var for var in (self.gamma, self.phi, self.zeta, self.kappa) if isinstance(var, tf.Variable)]
-    
+
     @property
     def all(self):
         return (self.gamma, self.phi, self.zeta, self.kappa)
-    
+
     @property
     def L1_norm(self):
         tensor = tf.stack([tf.cast(var, self.complextype) for var in self.all])
         return tf.abs(tf.linalg.norm(tensor, ord=1))
 
-
-    def plot(self, name:str, layer:int = None):
+    def plot(self, name: str, layer: int = None):
         """
         Plots the history of the parameters during the learning phase.
         Complex parameters are plotted as paths in the complex plane,
@@ -77,46 +79,46 @@ class Parameters:
         """
         values = np.array(self._history[name])
         if layer is not None:
-            values = values[:,layer]
-        
-        if name.lower() in {'gamma', 'zeta'}:
-            fig, ax = plt.subplots(figsize=(7,7))
-            ax.set_aspect('equal')
+            values = values[:, layer]
 
-            xlim = 1.1*np.max(np.abs(np.real(values)))
-            ylim = 1.1*np.max(np.abs(np.imag(values)))
+        if name.lower() in {"gamma", "zeta"}:
+            fig, ax = plt.subplots(figsize=(7, 7))
+            ax.set_aspect("equal")
+
+            xlim = 1.1 * np.max(np.abs(np.real(values)))
+            ylim = 1.1 * np.max(np.abs(np.imag(values)))
 
             ax.set_xlim(-xlim, xlim)
             ax.set_ylim(-ylim, ylim)
-            ax.set_xlabel('Real')
-            ax.set_ylabel('Imag')
+            ax.set_xlabel("Real")
+            ax.set_ylabel("Imag")
 
             for v in np.transpose(values):
                 plt.plot(np.real(v), np.imag(v))
                 plt.grid()
 
         else:
-            fig, ax = plt.subplots(figsize=(7,5))
-            ax.set_xlabel('step')
-            ax.set_ylabel('value')
-            
+            fig, ax = plt.subplots(figsize=(7, 5))
+            ax.set_xlabel("step")
+            ax.set_ylabel("value")
+
             for v in np.transpose(values):
                 plt.plot(v)
             plt.grid()
 
-        ax.set_title(name + ', all layers' if layer is None else f', layer {layer}')
+        ax.set_title(name + ", all layers" if layer is None else f", layer {layer}")
         return ax
 
     def save(self):
-        self._history['gamma'].append(self.gamma.numpy())
-        self._history['phi'].append(self.phi.numpy())
-        self._history['zeta'].append(self.zeta.numpy())
-        self._history['kappa'].append(self.kappa.numpy())
+        self._history["gamma"].append(self.gamma.numpy())
+        self._history["phi"].append(self.phi.numpy())
+        self._history["zeta"].append(self.zeta.numpy())
+        self._history["kappa"].append(self.kappa.numpy())
 
     def __repr__(self):
         g = self.gamma.numpy()
         p = self.phi.numpy()
         z = self.zeta.numpy()
         k = self.kappa.numpy()
-        string =f"gamma: {g}\nphi: {p}\nzeta: {z}\nkappa: {k}"
+        string = f"gamma: {g}\nphi: {p}\nzeta: {z}\nkappa: {k}"
         return string

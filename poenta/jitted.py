@@ -16,6 +16,7 @@
 import numpy as np
 from numba import jit
 
+
 @jit(nopython=True)
 def C_mu_Sigma(gamma, phi, z):
     """
@@ -36,12 +37,24 @@ def C_mu_Sigma(gamma, phi, z):
     r = np.abs(z)
     delta = np.angle(z)
 
-    C = np.exp(-0.5*np.abs(gamma)**2 - 0.5*np.conj(gamma)**2*np.exp(1j*(2*phi+delta))*np.tanh(r))/np.sqrt(np.cosh(r))
-    mu = np.array([np.conj(gamma)*np.exp(1j*(2*phi+delta))*np.tanh(r) + gamma, -np.conj(gamma)*np.exp(1j*phi)/np.cosh(r)])
-    Sigma = np.array([[np.exp(1j*(2*phi+delta))*np.tanh(r), -np.exp(1j*phi)/np.cosh(r)],
-                     [-np.exp(1j*phi)/np.cosh(r), -np.exp(-1j*delta)*np.tanh(r)]])
-    
+    C = np.exp(
+        -0.5 * np.abs(gamma) ** 2 - 0.5 * np.conj(gamma) ** 2 * np.exp(1j * (2 * phi + delta)) * np.tanh(r)
+    ) / np.sqrt(np.cosh(r))
+    mu = np.array(
+        [
+            np.conj(gamma) * np.exp(1j * (2 * phi + delta)) * np.tanh(r) + gamma,
+            -np.conj(gamma) * np.exp(1j * phi) / np.cosh(r),
+        ]
+    )
+    Sigma = np.array(
+        [
+            [np.exp(1j * (2 * phi + delta)) * np.tanh(r), -np.exp(1j * phi) / np.cosh(r)],
+            [-np.exp(1j * phi) / np.cosh(r), -np.exp(-1j * delta) * np.tanh(r)],
+        ]
+    )
+
     return C, mu, Sigma
+
 
 @jit(nopython=True)
 def dC_dmu_dSigma(gamma, phi, z):
@@ -65,55 +78,79 @@ def dC_dmu_dSigma(gamma, phi, z):
     delta = np.angle(z)
 
     # dC
-    dC_dgamma = (-0.5*np.conj(gamma))*C
-    dC_dgammac = (-0.5*gamma - np.conj(gamma)*np.exp(1j*(2*phi+delta))*np.tanh(r))*C
-    dC_dphi = (-1j*np.conj(gamma)**2*np.exp(1j*(2*phi+delta))*np.tanh(r))*C
-    dC_dr = (- 0.5*np.conj(gamma)**2*np.exp(1j*(2*phi+delta))/np.cosh(r)**2)*C - 0.5*np.tanh(r)*C
-    dC_ddelta = (- 0.5j*np.conj(gamma)**2*np.exp(1j*(2*phi+delta))*np.tanh(r))*C
+    dC_dgamma = (-0.5 * np.conj(gamma)) * C
+    dC_dgammac = (-0.5 * gamma - np.conj(gamma) * np.exp(1j * (2 * phi + delta)) * np.tanh(r)) * C
+    dC_dphi = (-1j * np.conj(gamma) ** 2 * np.exp(1j * (2 * phi + delta)) * np.tanh(r)) * C
+    dC_dr = (-0.5 * np.conj(gamma) ** 2 * np.exp(1j * (2 * phi + delta)) / np.cosh(r) ** 2) * C - 0.5 * np.tanh(r) * C
+    dC_ddelta = (-0.5j * np.conj(gamma) ** 2 * np.exp(1j * (2 * phi + delta)) * np.tanh(r)) * C
     if r > 0.01:
-        dC_ddelta_over_r = dC_ddelta/r
-    else: # Taylor series for tanh(r)/r
-        dC_ddelta_over_r = (- 0.5j*np.conj(gamma)**2*np.exp(1j*(2*phi+delta))*(1 - r**2/3. + 2*r**4/15.))*C
-    dC_dz = np.exp(-1j*delta)*(dC_dr - 1j*dC_ddelta_over_r)
-    dC_dzc = np.exp(1j*delta)*(dC_dr + 1j*dC_ddelta_over_r)
+        dC_ddelta_over_r = dC_ddelta / r
+    else:  # Taylor series for tanh(r)/r
+        dC_ddelta_over_r = (
+            -0.5j * np.conj(gamma) ** 2 * np.exp(1j * (2 * phi + delta)) * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)
+        ) * C
+    dC_dz = np.exp(-1j * delta) * (dC_dr - 1j * dC_ddelta_over_r)
+    dC_dzc = np.exp(1j * delta) * (dC_dr + 1j * dC_ddelta_over_r)
     dC = np.array([dC_dgamma, dC_dgammac, dC_dphi, dC_dz, dC_dzc])
 
     # dmu
     dmu_dgamma = np.array([1.0, 0.0], dtype=np.complex128)
-    dmu_dgammac = np.array([np.exp(1j*(2*phi+delta))*np.tanh(r), -np.exp(1j*phi)/np.cosh(r)])
-    dmu_dphi = np.array([2j*np.conj(gamma)*np.exp(1j*(2*phi+delta))*np.tanh(r), -1j*np.exp(1j*phi)/np.cosh(r)])
-    dmu_dr = np.array([np.conj(gamma)*np.exp(1j*(2*phi+delta))/np.cosh(r)**2, np.conj(gamma)*np.exp(1j*phi)*np.tanh(r)/np.cosh(r)])
-    dmu_ddelta = np.array([1j*np.conj(gamma)*np.exp(1j*(2*phi+delta))*np.tanh(r), 0.0])
+    dmu_dgammac = np.array([np.exp(1j * (2 * phi + delta)) * np.tanh(r), -np.exp(1j * phi) / np.cosh(r)])
+    dmu_dphi = np.array(
+        [2j * np.conj(gamma) * np.exp(1j * (2 * phi + delta)) * np.tanh(r), -1j * np.exp(1j * phi) / np.cosh(r)]
+    )
+    dmu_dr = np.array(
+        [
+            np.conj(gamma) * np.exp(1j * (2 * phi + delta)) / np.cosh(r) ** 2,
+            np.conj(gamma) * np.exp(1j * phi) * np.tanh(r) / np.cosh(r),
+        ]
+    )
+    dmu_ddelta = np.array([1j * np.conj(gamma) * np.exp(1j * (2 * phi + delta)) * np.tanh(r), 0.0])
     if r > 0.01:
-        dmu_ddelta_over_r = dmu_ddelta/r
-    else: # Taylor series for tanh(r)/r
-        dmu_ddelta_over_r = np.array([1j*np.conj(gamma)*np.exp(1j*(2*phi+delta))*(1 - r**2/3. + 2*r**4/15.), 0.0])
-    dmu_dz = np.exp(-1j*delta)*(dmu_dr - 1j*dmu_ddelta_over_r)
-    dmu_dzc = np.exp(1j*delta)*(dmu_dr + 1j*dmu_ddelta_over_r)
+        dmu_ddelta_over_r = dmu_ddelta / r
+    else:  # Taylor series for tanh(r)/r
+        dmu_ddelta_over_r = np.array(
+            [1j * np.conj(gamma) * np.exp(1j * (2 * phi + delta)) * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0]
+        )
+    dmu_dz = np.exp(-1j * delta) * (dmu_dr - 1j * dmu_ddelta_over_r)
+    dmu_dzc = np.exp(1j * delta) * (dmu_dr + 1j * dmu_ddelta_over_r)
     dmu = np.stack((dmu_dgamma, dmu_dgammac, dmu_dphi, dmu_dz, dmu_dzc), axis=-1)
 
     # dSigma
-    dSigma_dgamma = np.array([[0.0, 0.0],[0.0, 0.0]], dtype=np.complex128)
-    dSigma_dgammac = np.array([[0.0, 0.0],[0.0, 0.0]], dtype=np.complex128)
-    dSigma_dphi = np.array([[2j*np.exp(1j*(2*phi+delta))*np.tanh(r), -1j*np.exp(1j*phi)/np.cosh(r)],
-                            [-1j*np.exp(1j*phi)/np.cosh(r), 0.0]])
-    dSigma_dr = np.array([[np.exp(1j*(2*phi+delta))/np.cosh(r)**2, np.exp(1j*phi)*np.tanh(r)/np.cosh(r)],
-                          [np.exp(1j*phi)*np.tanh(r)/np.cosh(r), -np.exp(-1j*delta)/np.cosh(r)**2]])
-    dSigma_ddelta = np.array([[1j*np.exp(1j*(2*phi+delta))*np.tanh(r), 0.0],
-                              [0.0, 1j*np.exp(-1j*delta)*np.tanh(r)]])
+    dSigma_dgamma = np.array([[0.0, 0.0], [0.0, 0.0]], dtype=np.complex128)
+    dSigma_dgammac = np.array([[0.0, 0.0], [0.0, 0.0]], dtype=np.complex128)
+    dSigma_dphi = np.array(
+        [
+            [2j * np.exp(1j * (2 * phi + delta)) * np.tanh(r), -1j * np.exp(1j * phi) / np.cosh(r)],
+            [-1j * np.exp(1j * phi) / np.cosh(r), 0.0],
+        ]
+    )
+    dSigma_dr = np.array(
+        [
+            [np.exp(1j * (2 * phi + delta)) / np.cosh(r) ** 2, np.exp(1j * phi) * np.tanh(r) / np.cosh(r)],
+            [np.exp(1j * phi) * np.tanh(r) / np.cosh(r), -np.exp(-1j * delta) / np.cosh(r) ** 2],
+        ]
+    )
+    dSigma_ddelta = np.array(
+        [[1j * np.exp(1j * (2 * phi + delta)) * np.tanh(r), 0.0], [0.0, 1j * np.exp(-1j * delta) * np.tanh(r)]]
+    )
     if r > 0.01:
-        dSigma_ddelta_over_r = dSigma_ddelta/r
-    else: # Taylor series for tanh(r)/r
-        dSigma_ddelta_over_r = np.array([[1j*np.exp(1j*(2*phi+delta))*(1 - r**2/3. + 2*r**4/15.), 0.0],
-                              [0.0, 1j*np.exp(-1j*delta)*(1 - r**2/3. + 2*r**4/15.)]])
-    dSigma_dz = np.exp(-1j*delta)*(dSigma_dr - 1j*dSigma_ddelta_over_r)
-    dSigma_dzc = np.exp(1j*delta)*(dSigma_dr + 1j*dSigma_ddelta_over_r)
+        dSigma_ddelta_over_r = dSigma_ddelta / r
+    else:  # Taylor series for tanh(r)/r
+        dSigma_ddelta_over_r = np.array(
+            [
+                [1j * np.exp(1j * (2 * phi + delta)) * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0],
+                [0.0, 1j * np.exp(-1j * delta) * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)],
+            ]
+        )
+    dSigma_dz = np.exp(-1j * delta) * (dSigma_dr - 1j * dSigma_ddelta_over_r)
+    dSigma_dzc = np.exp(1j * delta) * (dSigma_dr + 1j * dSigma_ddelta_over_r)
     dSigma = np.stack((dSigma_dgamma, dSigma_dgammac, dSigma_dphi, dSigma_dz, dSigma_dzc), axis=-1)
 
     return dC, dmu, dSigma
 
 
-@jit(nopython = True)
+@jit(nopython=True)
 def R_matrix(gamma, phi, z, old_state):
     """
     Directly constructs the transformed state recursively and exactly.
@@ -132,29 +169,33 @@ def R_matrix(gamma, phi, z, old_state):
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
 
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
-    
+
     R = np.zeros((cutoff, cutoff), dtype=dtype)
     G0 = np.zeros(cutoff, dtype=dtype)
-    
+
     # first row of Transformation matrix
     G0[0] = C
     for n in range(1, cutoff):
-        G0[n] = mu[1]/sqrt[n]*G0[n-1] - Sigma[1,1]*sqrt[n-1]/sqrt[n]*G0[n-2]
-    
+        G0[n] = mu[1] / sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2]
+
     # first row of R matrix
     for n in range(cutoff):
-        R[0, n] = np.dot(G0[:cutoff - n], old_state)
-        old_state = old_state[1:]*sqrt[1:cutoff-n]
+        R[0, n] = np.dot(G0[: cutoff - n], old_state)
+        old_state = old_state[1:] * sqrt[1 : cutoff - n]
 
     # rest of R matrix
     for m in range(1, cutoff):
-        for n in range(cutoff-m): 
-            R[m, n] = mu[0]/sqrt[m]*R[m-1, n] - Sigma[0,0]*sqrt[m-1]/sqrt[m]*R[m-2, n] - Sigma[0,1]/sqrt[m]*R[m-1, n+1]
-            
+        for n in range(cutoff - m):
+            R[m, n] = (
+                mu[0] / sqrt[m] * R[m - 1, n]
+                - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]
+                - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
+            )
+
     return R
 
 
-@jit(nopython = True)
+@jit(nopython=True)
 def G_matrix(gamma, phi, z, cutoff, dtype=np.complex128):
     """
     Constructs the Gaussian transformation recursively
@@ -170,24 +211,27 @@ def G_matrix(gamma, phi, z, cutoff, dtype=np.complex128):
         G (complex array[cutoff]): the single-mode Gaussian transformation matrix
     """
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
-    G = np.zeros((cutoff, cutoff), dtype=dtype) #maybe numba cannot create array of zeros of type complex64
+    G = np.zeros((cutoff, cutoff), dtype=dtype)  # maybe numba cannot create array of zeros of type complex64
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
-    
-    # First column 
-    G[0,0] = C
-    for m in range(cutoff-1):
-        G[m+1,0] = mu[0]/sqrt[m+1]*G[m,0] - Sigma[0,0]*sqrt[m]/sqrt[m+1]*G[m-1,0]
-    
+
+    # First column
+    G[0, 0] = C
+    for m in range(cutoff - 1):
+        G[m + 1, 0] = mu[0] / sqrt[m + 1] * G[m, 0] - Sigma[0, 0] * sqrt[m] / sqrt[m + 1] * G[m - 1, 0]
+
     # All rows
     for m in range(cutoff):
-        for n in range(cutoff-1): 
-            G[m, n+1] = mu[1]/sqrt[n+1]*G[m, n] - Sigma[1,0]*sqrt[m]/sqrt[n+1]*G[m-1, n] - Sigma[1,1]*sqrt[n]/sqrt[n+1]*G[m, n-1]
-            
+        for n in range(cutoff - 1):
+            G[m, n + 1] = (
+                mu[1] / sqrt[n + 1] * G[m, n]
+                - Sigma[1, 0] * sqrt[m] / sqrt[n + 1] * G[m - 1, n]
+                - Sigma[1, 1] * sqrt[n] / sqrt[n + 1] * G[m, n - 1]
+            )
+
     return G
 
 
-
-@jit(nopython = True)
+@jit(nopython=True)
 def grad_newstate(gamma, phi, z, psi, G0, R):
     """
     Computes the gradient of the new state with respect to
@@ -205,42 +249,49 @@ def grad_newstate(gamma, phi, z, psi, G0, R):
         (complex array[5, cutoff]): gradient of the new state with respect to
                                     gamma, gamma*, phi, z, z*
     """
-    
+
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
     dC, dmu, dSigma = dC_dmu_dSigma(gamma, phi, z)
-    
+
     cutoff = len(psi)
     dtype = psi.dtype
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
-    
+
     dR = np.zeros((cutoff, cutoff, 5), dtype=dtype)
     dG0 = np.zeros((cutoff, 5), dtype=dtype)
-    
+
     # grad of first row of Transformation matrix
     dG0[0] = dC
-    for n in range(cutoff-1):
-        dG0[n+1] = (dmu[1]*G0[n] + mu[1]*dG0[n] - dSigma[1,1]*sqrt[n]*G0[n-1] - Sigma[1,1]*sqrt[n]*dG0[n-1])/sqrt[n+1]
-    
+    for n in range(cutoff - 1):
+        dG0[n + 1] = (
+            dmu[1] * G0[n] + mu[1] * dG0[n] - dSigma[1, 1] * sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n] * dG0[n - 1]
+        ) / sqrt[n + 1]
+
     # first row of dR matrix
     for n in range(cutoff):
-        dR[0, n] = np.dot(np.transpose(dG0[:cutoff - n]), psi)
-        psi = psi[1:]*sqrt[1:cutoff-n]
+        dR[0, n] = np.dot(np.transpose(dG0[: cutoff - n]), psi)
+        psi = psi[1:] * sqrt[1 : cutoff - n]
 
     # rest of dR matrix
     for m in range(cutoff - 1):
         for k in range(cutoff - m - 1):
-            dR[m+1, k] = (dmu[0]*R[m, k] + mu[0]*dR[m, k] - dSigma[0,0]*sqrt[m]*R[m-1, k] - Sigma[0,0]*sqrt[m]*dR[m-1, k] - Sigma[0,1]*dR[m, k+1] - dSigma[0,1]*R[m, k+1])/sqrt[m+1]
-            
-    return np.transpose(dR[:,0])
+            dR[m + 1, k] = (
+                dmu[0] * R[m, k]
+                + mu[0] * dR[m, k]
+                - dSigma[0, 0] * sqrt[m] * R[m - 1, k]
+                - Sigma[0, 0] * sqrt[m] * dR[m - 1, k]
+                - Sigma[0, 1] * dR[m, k + 1]
+                - dSigma[0, 1] * R[m, k + 1]
+            ) / sqrt[m + 1]
 
-
-
+    return np.transpose(dR[:, 0])
 
 
 # Extras
 
-@jit(nopython = True)
-def approx_new_state(gamma, phi, z, old_state, order = None):
+
+@jit(nopython=True)
+def approx_new_state(gamma, phi, z, old_state, order=None):
     """
     Constructs the transformed state recursively and exactly
     up to the Nth Fock amplitude, indicated by the keyword argument `order`
@@ -257,29 +308,33 @@ def approx_new_state(gamma, phi, z, old_state, order = None):
 
     """
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
-    
+
     cutoff = old_state.shape[0]
     dtype = old_state.dtype
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
     if order is None:
         order = cutoff
-    
+
     R = np.zeros((cutoff, cutoff), dtype=dtype)
     G0 = np.zeros(cutoff, dtype=dtype)
-    
+
     # first row of Transformation matrix
     G0[0] = C
     for n in range(1, cutoff):
-        G0[n] = mu[1]/sqrt[n]*G0[n-1] - Sigma[1,1]*sqrt[n-1]/sqrt[n]*G0[n-2]
-    
+        G0[n] = mu[1] / sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2]
+
     # first row of R matrix
     for n in range(order):
-        R[0, n] = np.dot(G0[:cutoff - n], old_state)
-        old_state = old_state[1:]*sqrt[1:cutoff-n]
+        R[0, n] = np.dot(G0[: cutoff - n], old_state)
+        old_state = old_state[1:] * sqrt[1 : cutoff - n]
 
     # rest of R matrix
     for m in range(1, cutoff):
-        for n in range(max(1, order-m)): 
-            R[m, n] = mu[0]/sqrt[m]*R[m-1, n] - Sigma[0,0]*sqrt[m-1]/sqrt[m]*R[m-2, n] - Sigma[0,1]/sqrt[m]*R[m-1, n+1]
-            
+        for n in range(max(1, order - m)):
+            R[m, n] = (
+                mu[0] / sqrt[m] * R[m - 1, n]
+                - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]
+                - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
+            )
+
     return R[:, 0]
