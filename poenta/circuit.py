@@ -31,12 +31,16 @@ class Config:
     num_layers: int
     steps: int
     optimizer: str = "Adam"
+    random_seed: int = 666
     LR: float = 0.001
     LR_schedule: dict = field(default_factory=dict)  # optional
 
 
 class Circuit:
     def __init__(self, config: Config):
+        tf.random.set_seed(config.random_seed)
+        np.random.seed(config.random_seed)
+        
         self.config = config
         self.state_in = tf.cast(tf.constant(config.state_in), dtype=config.dtype)
         self.objective = tf.cast(tf.constant(config.objective), dtype=config.dtype)
