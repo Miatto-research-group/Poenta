@@ -51,7 +51,7 @@ def GaussianTransformation(gamma, phi, z, Psi):
         grad_gammac = tf.reduce_sum(dy * np.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * np.conj(dPsi_dphi)))
         grad_zc = tf.reduce_sum(dy * np.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
-        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)
+        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True) #NOTE: can we compute directly the product between G and dy?
         return grad_gammac, grad_phi, grad_zc, grad_Psic
 
     return Psi_new, grad
