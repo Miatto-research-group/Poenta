@@ -17,6 +17,7 @@ import tensorflow as tf
 import numpy as np
 from tqdm.notebook import tqdm
 from dataclasses import dataclass, field
+from prettytable import PrettyTable
 
 from .nputils import init_complex, init_real
 from .tfutils import GaussianTransformation, kerr
@@ -80,7 +81,7 @@ class Circuit:
     def minimize_step(self) -> float:
         self._state_out = None  # reset lazy output state
         self.parameters.save()  # save current values before updating
-        self.optimizer.minimize(self.loss, self.parameters.learnable)
+        self.optimizer.minimize(self.loss, self.parameters.trainable)
         return self.loss()
 
     def minimize(self) -> list:
@@ -106,3 +107,15 @@ class Circuit:
                 print(f"other exception: {e}")
                 raise e
         return loss_list
+
+    def __repr__(self):
+        table = PrettyTable()
+        table.add_column("Layers",[self.config.num_layers])
+        table.add_column("Cutoff", [self.cutoff])
+        table.add_column("Optimizer", [self.config.optimizer])
+        trainable_pars = np.sum([p.shape for p in self.parameters.all])
+        tot_pars = np.sum([p.shape for p in self.parameters.trainable])
+        table.add_column("Params (trainable/tot)", [f"{trainable_pars}/{tot_pars}"])
+        
+        return str(table)
+

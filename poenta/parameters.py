@@ -22,7 +22,7 @@ from .nputils import init_complex, init_real
 
 class Parameters:
     """
-    Utility class to hold and manage the parameters of a circuit (learnable or constant).
+    Utility class to hold and manage the parameters of a circuit (trainable or constant).
     The `Parameters` class allows to store, visualize and share optimization results.
     As an example, the `Circuit` class contains an instance of `Parameters`.
     """
@@ -55,7 +55,7 @@ class Parameters:
         }
 
     @property
-    def learnable(self):
+    def trainable(self):
         return [var for var in (self.gamma, self.phi, self.zeta, self.kappa) if isinstance(var, tf.Variable)]
 
     @property
