@@ -16,6 +16,7 @@
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+from prettytable import PrettyTable
 
 from .nputils import init_complex, init_real
 
@@ -59,12 +60,16 @@ class Parameters:
         return [var for var in (self.gamma, self.phi, self.zeta, self.kappa) if isinstance(var, tf.Variable)]
 
     @property
+    def constant(self):
+        return [var for var in (self.gamma, self.phi, self.zeta, self.kappa) if isinstance(var, tf.Tensor)]
+
+    @property
     def all(self):
         return (self.gamma, self.phi, self.zeta, self.kappa)
 
     @property
     def L1_norm(self):
-        tensor = tf.stack([tf.cast(var, self.complextype) for var in self.all])
+        tensor = tf.stack([tf.cast(var, self.complextype) for var in self.trainable])
         return tf.abs(tf.linalg.norm(tensor, ord=1))
 
     def plot(self, name: str, layer: int = None):
@@ -116,9 +121,10 @@ class Parameters:
         self._history["kappa"].append(self.kappa.numpy())
 
     def __repr__(self):
-        g = self.gamma.numpy()
-        p = self.phi.numpy()
-        z = self.zeta.numpy()
-        k = self.kappa.numpy()
-        string = f"gamma: {g}\nphi: {p}\nzeta: {z}\nkappa: {k}"
-        return string
+        table = PrettyTable() 
+        table.add_column('Layer', list(range(1, 1+self.gamma.shape[0])))
+        table.add_column('gamma', [f"{val:.3f}" for val in self.gamma.numpy()])
+        table.add_column('phi', [f"{val:.3f}" for val in self.phi.numpy()])
+        table.add_column('zeta', [f"{val:.3f}" for val in self.zeta.numpy()])
+        table.add_column('kappa', [f"{val:.3f}" for val in self.kappa.numpy()])
+        return str(table)
