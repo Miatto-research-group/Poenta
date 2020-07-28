@@ -15,8 +15,25 @@
 
 import tensorflow as tf
 import numpy as np
-
 from .jitted import G_matrix, grad_newstate, R_matrix
+
+
+def complex_initializer(dtype):
+    f = tf.random_normal_initializer()
+    def initializer(*args, dtype, **kwargs):
+        real = f(*args, **kwargs)
+        imag = f(*args, **kwargs)
+        return tf.cast(tf.complex(real, imag), dtype)
+
+    return initializer
+
+def real_initializer(dtype):
+    f = tf.random_normal_initializer()
+    def initializer(*args, dtype, **kwargs):
+        real = f(*args, **kwargs)
+        return tf.cast(real, dtype)
+
+    return initializer
 
 
 @tf.custom_gradient
@@ -67,3 +84,5 @@ def kerr(k, cutoff: int, dtype: tf.dtypes.DType):
     """
     diag = tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff) ** 2)
     return diag
+
+
