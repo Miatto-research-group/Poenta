@@ -17,8 +17,8 @@ import numpy as np
 from numba import jit
 
 
-@jit(nopython=True)
-def C_mu_Sigma(gamma, phi, z):
+# @jit(nopython=True)
+def C_mu_Sigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     """
     Utility function to construct:
     1. C constant
@@ -56,8 +56,8 @@ def C_mu_Sigma(gamma, phi, z):
     return C, mu, Sigma
 
 
-@jit(nopython=True)
-def dC_dmu_dSigma(gamma, phi, z):
+# @jit(nopython=True)
+def dC_dmu_dSigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     """
     Utility function to construct the gradient of:
     1. C constant
@@ -89,8 +89,8 @@ def dC_dmu_dSigma(gamma, phi, z):
         dC_ddelta_over_r = (
             -0.5j * np.conj(gamma) ** 2 * np.exp(1j * (2 * phi + delta)) * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)
         ) * C
-    dC_dz = np.exp(-1j * delta) * (dC_dr - 1j * dC_ddelta_over_r)
-    dC_dzc = np.exp(1j * delta) * (dC_dr + 1j * dC_ddelta_over_r)
+    dC_dz = np.exp(-1j * delta) * (dC_dr - 1j * dC_ddelta_over_r) * 0.5
+    dC_dzc = np.exp(1j * delta) * (dC_dr + 1j * dC_ddelta_over_r) * 0.5
     dC = np.array([dC_dgamma, dC_dgammac, dC_dphi, dC_dz, dC_dzc])
 
     # dmu
@@ -112,8 +112,8 @@ def dC_dmu_dSigma(gamma, phi, z):
         dmu_ddelta_over_r = np.array(
             [1j * np.conj(gamma) * np.exp(1j * (2 * phi + delta)) * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0]
         )
-    dmu_dz = np.exp(-1j * delta) * (dmu_dr - 1j * dmu_ddelta_over_r)
-    dmu_dzc = np.exp(1j * delta) * (dmu_dr + 1j * dmu_ddelta_over_r)
+    dmu_dz = np.exp(-1j * delta) * (dmu_dr - 1j * dmu_ddelta_over_r) * 0.5
+    dmu_dzc = np.exp(1j * delta) * (dmu_dr + 1j * dmu_ddelta_over_r) * 0.5
     dmu = np.stack((dmu_dgamma, dmu_dgammac, dmu_dphi, dmu_dz, dmu_dzc), axis=-1)
 
     # dSigma
@@ -150,8 +150,8 @@ def dC_dmu_dSigma(gamma, phi, z):
     return dC, dmu, dSigma
 
 
-@jit(nopython=True)
-def R_matrix(gamma, phi, z, old_state):
+# @jit(nopython=True)
+def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_state: np.array) -> np.array:
     """
     Directly constructs the transformed state recursively and exactly.
 
@@ -164,8 +164,8 @@ def R_matrix(gamma, phi, z, old_state):
     Returns:
         R (complex array[D,D]): the matrix whose 1st column is the transformed state
     """
-    cutoff = old_state.shape[0]
     dtype = old_state.dtype
+    print(dtype)
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
 
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
@@ -195,8 +195,8 @@ def R_matrix(gamma, phi, z, old_state):
     return R
 
 
-@jit(nopython=True)
-def G_matrix(gamma, phi, z, cutoff, dtype=np.complex128):
+# @jit(nopython=True)
+def G_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dtype: np.dtype = np.complex128) -> np.array:
     """
     Constructs the Gaussian transformation recursively
 
@@ -231,8 +231,8 @@ def G_matrix(gamma, phi, z, cutoff, dtype=np.complex128):
     return G
 
 
-@jit(nopython=True)
-def grad_newstate(gamma, phi, z, psi, G0, R):
+# @jit(nopython=True)
+def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff:int, psi: np.array, G0: np.array, R: np.array) -> list:
     """
     Computes the gradient of the new state with respect to
     gamma, gamma*, phi, z, z* but not with respect to the old state
@@ -246,14 +246,14 @@ def grad_newstate(gamma, phi, z, psi, G0, R):
         R (complex array[D,D]): complete R matrix
 
     Returns:
-        (complex array[5, cutoff]): gradient of the new state with respect to
+        list[complex array[cutoff]]: gradient of the new state with respect to
                                     gamma, gamma*, phi, z, z*
     """
 
+    print('state in grad_newstate: ', psi)
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
     dC, dmu, dSigma = dC_dmu_dSigma(gamma, phi, z)
 
-    cutoff = len(psi)
     dtype = psi.dtype
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
 
@@ -284,11 +284,12 @@ def grad_newstate(gamma, phi, z, psi, G0, R):
                 - dSigma[0, 1] * R[m, k + 1]
             ) / sqrt[m + 1]
 
-    return np.transpose(dR[:, 0])
+    return list(np.transpose(dR[:, 0]))
+
+
 
 
 # Extras
-
 
 @jit(nopython=True)
 def approx_new_state(gamma, phi, z, old_state, order=None):

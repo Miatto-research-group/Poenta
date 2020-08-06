@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from prettytable import PrettyTable
 
 from .nputils import init_complex, init_real
-from .tfutils import GaussianTransformation, kerr
+from .tfutils import GaussianTransformation, KerrDiagonal
 from .parameters import Parameters
 
 
