@@ -121,10 +121,10 @@ class Parameters:
         self._history["kappa"].append(self.kappa.numpy())
 
     def __repr__(self):
-        table = PrettyTable() 
-        table.add_column('Layer', list(range(1, 1+self.gamma.shape[0])))
-        table.add_column('gamma', [f"{val:.3f}" for val in self.gamma.numpy()])
-        table.add_column('phi', [f"{val:.3f}" for val in self.phi.numpy()])
-        table.add_column('zeta', [f"{val:.3f}" for val in self.zeta.numpy()])
-        table.add_column('kappa', [f"{val:.3f}" for val in self.kappa.numpy()])
+        table = PrettyTable()
+        table.add_column("Layer", list(range(1, 1 + self.gamma.shape[0])))
+        table.add_column("gamma", [f"{val:.3f}" for val in self.gamma.numpy()])
+        table.add_column("phi", [f"{val:.3f}" for val in self.phi.numpy()])
+        table.add_column("zeta", [f"{val:.3f}" for val in self.zeta.numpy()])
+        table.add_column("kappa", [f"{val:.3f}" for val in self.kappa.numpy()])
         return str(table)
