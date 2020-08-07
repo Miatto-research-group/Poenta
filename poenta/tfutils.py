@@ -20,6 +20,7 @@ from .jitted import G_matrix, grad_newstate, R_matrix
 
 def complex_initializer(dtype):
     f = tf.random_normal_initializer()
+
     def initializer(*args, dtype, **kwargs):
         real = f(*args, **kwargs)
         imag = f(*args, **kwargs)
@@ -27,8 +28,10 @@ def complex_initializer(dtype):
 
     return initializer
 
+
 def real_initializer(dtype):
     f = tf.random_normal_initializer()
+
     def initializer(*args, dtype, **kwargs):
         real = f(*args, **kwargs)
         return tf.cast(real, dtype)
@@ -68,7 +71,9 @@ def GaussianTransformation(gamma, phi, z, Psi):
         grad_gammac = tf.reduce_sum(dy * np.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * np.conj(dPsi_dphi)))
         grad_zc = tf.reduce_sum(dy * np.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
-        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True) #NOTE: can we compute directly the product between G and dy?
+        grad_Psic = tf.linalg.matvec(
+            G, dy, adjoint_a=True
+        )  # NOTE: can we compute directly the product between G and dy?
         return grad_gammac, grad_phi, grad_zc, grad_Psic
 
     return Psi_new, grad
@@ -84,5 +89,3 @@ def kerr(k, cutoff: int, dtype: tf.dtypes.DType):
     """
     diag = tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff) ** 2)
     return diag
-
-

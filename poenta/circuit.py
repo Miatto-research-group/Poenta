@@ -15,7 +15,7 @@
 
 import tensorflow as tf
 import numpy as np
-from tqdm.notebook import tqdm
+from rich.progress import track, Progress, BarColumn, TimeRemainingColumn
 from dataclasses import dataclass, field
 from prettytable import PrettyTable
 
@@ -41,7 +41,7 @@ class Circuit:
     def __init__(self, config: Config):
         tf.random.set_seed(config.random_seed)
         np.random.seed(config.random_seed)
-        
+
         self.config = config
         self.state_in = tf.cast(tf.constant(config.state_in), dtype=config.dtype)
         self.objective = tf.cast(tf.constant(config.objective), dtype=config.dtype)
@@ -86,36 +86,44 @@ class Circuit:
 
     def minimize(self) -> list:
         loss_list = []
-        for i in tqdm(range(self.config.steps)):
-            try:
-                loss_list.append(self.minimize_step())
+        with Progress(
+            "[progress.description]{task.description}",
+            BarColumn(),
+            "[progress.percentage]{task.percentage:>3.0f}%",
+            TimeRemainingColumn(),
+            f"Fidelity: {100*(self.fidelity):.3f}",
+        ) as bar:
+            task = bar.add_task(description="Optimizing...", total=self.config.steps)
+            for i in range(self.config.steps):
+                try:
+                    loss_list.append(self.minimize_step())
 
-                # LR scheduling
-                for threshold, new_LR in self.config.LR_schedule.items():
-                    if loss_list[-1] < threshold:
-                        self.optimizer.lr = new_LR
+                    # LR scheduling
+                    for threshold, new_LR in self.config.LR_schedule.items():
+                        if loss_list[-1] < threshold:
+                            self.optimizer.lr = new_LR
 
-                if i % 10 == 0:
-                    print(
-                        f"Step {i}/{self.config.steps}: Fidelity = {100*(self.fidelity):.3f}%, LR = {self.optimizer.lr.numpy():.5f}",
-                        end="\r",
-                    )
+                    # if i % 10 == 0:
+                    #     print(
+                    #         f"Step {i}/{self.config.steps}: Fidelity = {100*(self.fidelity):.3f}%, LR = {self.optimizer.lr.numpy():.5f}",
+                    #         end="\r",
+                    #     )
 
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                print(f"other exception: {e}")
-                raise e
+                except KeyboardInterrupt:
+                    break
+                except Exception as e:
+                    print(f"other exception: {e}")
+                    raise e
+                bar.advance(task)
         return loss_list
 
     def __repr__(self):
         table = PrettyTable()
-        table.add_column("Layers",[self.config.num_layers])
+        table.add_column("Layers", [self.config.num_layers])
         table.add_column("Cutoff", [self.cutoff])
         table.add_column("Optimizer", [self.config.optimizer])
         trainable_pars = np.sum([p.shape for p in self.parameters.all])
         tot_pars = np.sum([p.shape for p in self.parameters.trainable])
         table.add_column("Params (trainable/tot)", [f"{trainable_pars}/{tot_pars}"])
-        
-        return str(table)
 
+        return str(table)

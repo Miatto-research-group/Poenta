@@ -89,8 +89,8 @@ def dC_dmu_dSigma(gamma, phi, z):
         dC_ddelta_over_r = (
             -0.5j * np.conj(gamma) ** 2 * np.exp(1j * (2 * phi + delta)) * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)
         ) * C
-    dC_dz = np.exp(-1j * delta) * (dC_dr - 1j * dC_ddelta_over_r)
-    dC_dzc = np.exp(1j * delta) * (dC_dr + 1j * dC_ddelta_over_r)
+    dC_dz = np.exp(-1j * delta) * (dC_dr - 1j * dC_ddelta_over_r) / 2
+    dC_dzc = np.exp(1j * delta) * (dC_dr + 1j * dC_ddelta_over_r) / 2
     dC = np.array([dC_dgamma, dC_dgammac, dC_dphi, dC_dz, dC_dzc])
 
     # dmu
@@ -112,8 +112,8 @@ def dC_dmu_dSigma(gamma, phi, z):
         dmu_ddelta_over_r = np.array(
             [1j * np.conj(gamma) * np.exp(1j * (2 * phi + delta)) * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0]
         )
-    dmu_dz = np.exp(-1j * delta) * (dmu_dr - 1j * dmu_ddelta_over_r)
-    dmu_dzc = np.exp(1j * delta) * (dmu_dr + 1j * dmu_ddelta_over_r)
+    dmu_dz = np.exp(-1j * delta) * (dmu_dr - 1j * dmu_ddelta_over_r) / 2
+    dmu_dzc = np.exp(1j * delta) * (dmu_dr + 1j * dmu_ddelta_over_r) / 2
     dmu = np.stack((dmu_dgamma, dmu_dgammac, dmu_dphi, dmu_dz, dmu_dzc), axis=-1)
 
     # dSigma
@@ -143,8 +143,8 @@ def dC_dmu_dSigma(gamma, phi, z):
                 [0.0, 1j * np.exp(-1j * delta) * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)],
             ]
         )
-    dSigma_dz = np.exp(-1j * delta) * (dSigma_dr - 1j * dSigma_ddelta_over_r)
-    dSigma_dzc = np.exp(1j * delta) * (dSigma_dr + 1j * dSigma_ddelta_over_r)
+    dSigma_dz = np.exp(-1j * delta) * (dSigma_dr - 1j * dSigma_ddelta_over_r) / 2
+    dSigma_dzc = np.exp(1j * delta) * (dSigma_dr + 1j * dSigma_ddelta_over_r) / 2
     dSigma = np.stack((dSigma_dgamma, dSigma_dgammac, dSigma_dphi, dSigma_dz, dSigma_dzc), axis=-1)
 
     return dC, dmu, dSigma
