@@ -46,6 +46,7 @@ class Circuit:
         self.state_in = tf.cast(tf.constant(config.state_in), dtype=config.dtype)
         self.objective = tf.cast(tf.constant(config.objective), dtype=config.dtype)
         self._state_out = None
+        self._fidelity = None
         self.cutoff = self.state_in.shape[0]
         self.optimizer = tf.optimizers.__dict__[config.optimizer](config.LR)
         self.parameters = Parameters(num_layers=self.config.num_layers, dtype=config.dtype)
@@ -71,29 +72,32 @@ class Circuit:
             self._state_out = state
         return self._state_out
 
-    @property
+    @property  # lazy property
     def fidelity(self):
-        return tf.abs(tf.reduce_sum(self.state_out * tf.math.conj(self.objective))) ** 2
+        if self._fidelity is None:
+            self._fidelity = tf.abs(tf.reduce_sum(self.state_out * tf.math.conj(self.objective))) ** 2
+        return self._fidelity
 
     def loss(self):
         return 1.0 - self.fidelity
 
     def minimize_step(self) -> float:
         self._state_out = None  # reset lazy output state
+        self._fidelity = None # reset lazy fidelity
         self.parameters.save()  # save current values before updating
         self.optimizer.minimize(self.loss, self.parameters.trainable)
         return self.loss()
 
     def minimize(self) -> list:
-        loss_list = []
+        loss_list = [] 
+        # progress_bar = 
         with Progress(
-            "[progress.description]{task.description}",
+            TextColumn("[progress.description] Iteration {task.fields[iteration]}/{task.total}"),
             BarColumn(),
-            "[progress.percentage]{task.percentage:>3.0f}%",
-            TimeRemainingColumn(),
-            TextColumn(f"Fidelity: {100*(self.fidelity):.3f}"),
-        ) as bar:
-            task = bar.add_task(description="Optimizing...", total=self.config.steps)
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("Loss = {task.fields[loss]:.5f}"),
+            "Time remaining: ", TimeRemainingColumn()) as bar:
+            task = bar.add_task(description="Optimizing...", total=self.config.steps, loss = self.loss())
             for i in range(self.config.steps):
                 try:
                     loss_list.append(self.minimize_step())
@@ -103,18 +107,12 @@ class Circuit:
                         if loss_list[-1] < threshold:
                             self.optimizer.lr = new_LR
 
-                    # if i % 10 == 0:
-                    #     print(
-                    #         f"Step {i}/{self.config.steps}: Fidelity = {100*(self.fidelity):.3f}%, LR = {self.optimizer.lr.numpy():.5f}",
-                    #         end="\r",
-                    #     )
-
                 except KeyboardInterrupt:
                     break
                 except Exception as e:
                     print(f"other exception: {e}")
                     raise e
-                bar.update(task, advance=1, refresh=True)
+                bar.update(task, advance=1, refresh=True, iteration = i, loss = self.loss())
         return loss_list
 
     def __repr__(self):
