@@ -15,7 +15,7 @@
 
 import tensorflow as tf
 import numpy as np
-from rich.progress import track, Progress, BarColumn, TimeRemainingColumn
+from rich.progress import track, Progress, BarColumn, TimeRemainingColumn, TextColumn
 from dataclasses import dataclass, field
 from prettytable import PrettyTable
 
@@ -91,7 +91,7 @@ class Circuit:
             BarColumn(),
             "[progress.percentage]{task.percentage:>3.0f}%",
             TimeRemainingColumn(),
-            f"Fidelity: {100*(self.fidelity):.3f}",
+            TextColumn(f"Fidelity: {100*(self.fidelity):.3f}"),
         ) as bar:
             task = bar.add_task(description="Optimizing...", total=self.config.steps)
             for i in range(self.config.steps):
@@ -114,7 +114,7 @@ class Circuit:
                 except Exception as e:
                     print(f"other exception: {e}")
                     raise e
-                bar.advance(task)
+                bar.update(task, advance=1, refresh=True)
         return loss_list
 
     def __repr__(self):
