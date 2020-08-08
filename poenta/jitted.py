@@ -24,38 +24,35 @@ def C_mu_Sigma(gamma, phi, z):
     1. C constant
     2. Mu vector
     3. Sigma matrix
-
     Arguments:
         gamma (complex): displacement parameter
         phi (float): phase rotation parameter
         z (complex): squeezing parameter
         dtype (numpy type): unused for now
-
     Returns:
         C (complex), mu (complex array[2]), Sigma (complex array[2,2])
     """
     r = np.abs(z)
-    cgamma = np.conj(gamma)
     delta = np.angle(z)
+    exp2phidelta = np.exp(1j * (2 * phi + delta))
+    eiphi = np.exp(1j * phi)
     tanhr = np.tanh(r)
     coshr = np.cosh(r)
-    e2phidelta = np.exp(1j * (2 * phi + delta))
-    eiphi = np.exp(1j * phi)
-    eidelta = np.exp(-1j * delta)
+    cgamma = np.conj(gamma)
 
     C = np.exp(
-        -0.5 * np.abs(gamma) ** 2 - 0.5 * cgamma ** 2 * e2phidelta * tanhr
+        -0.5 * np.abs(gamma) ** 2 - 0.5 * cgamma ** 2 * exp2phidelta * tanhr
     ) / np.sqrt(coshr)
     mu = np.array(
         [
-            cgamma * e2phidelta * tanhr + gamma,
-            -cgamma * eiphi/ coshr,
+            cgamma * exp2phidelta * tanhr + gamma,
+            -cgamma * eiphi / coshr,
         ]
     )
     Sigma = np.array(
         [
-            [e2phidelta * tanhr, -eiphi / coshr],
-            [-eiphi / coshr, -eidelta * tanhr],
+            [exp2phidelta * tanhr, -eiphi / coshr],
+            [-eiphi / coshr, -np.exp(-1j * delta) * tanhr],
         ]
     )
 
@@ -70,67 +67,61 @@ def dC_dmu_dSigma(gamma, phi, z):
     2. Mu vector
     3. Sigma matrix
     with respect to gamma, gamma*, phi, z and z*
-
     Arguments:
         gamma (complex): displacement parameter
         phi (float): phase rotation parameter
         z (complex): squeezing parameter
-
     Returns:
         dC (complex array[5]), dmu (complex array[2,5]), dSigma (complex array[2,2,5])
     """
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
     r = np.abs(z)
-    cgamma = np.conj(gamma)
     delta = np.angle(z)
+    exp2phidelta = np.exp(1j * (2 * phi + delta))
+    eidelta = np.exp(1j * delta)
+    eideltac = np.exp(-1j * delta)
+    eiphi = np.exp(1j * phi)
     tanhr = np.tanh(r)
     coshr = np.cosh(r)
-    e2phidelta = np.exp(1j * (2 * phi + delta))
-    eiphi = np.exp(1j * phi)
-    eidelta = np.exp(-1j * delta)
-
+    cgamma = np.conj(gamma)
 
     # dC
     dC_dgamma = (-0.5 * cgamma) * C
-    dC_dgammac = (-0.5 * gamma - cgamma * e2phidelta * tanhr) * C
-    dC_dphi = (-1j * cgamma ** 2 * e2phidelta * tanhr) * C
-    dC_dr = (-0.5 * cgamma ** 2 * e2phidelta / coshr ** 2) * C - 0.5 * tanhr * C
-    dC_ddelta = (-0.5j * cgamma ** 2 * e2phidelta * tanhr) * C
+    dC_dgammac = (-0.5 * gamma - cgamma * exp2phidelta * tanhr) * C
+    dC_dphi = (-1j * cgamma ** 2 * exp2phidelta * tanhr) * C
+    dC_dr = (-0.5 * cgamma ** 2 * exp2phidelta / coshr ** 2) * C - 0.5 * tanhr * C
+    dC_ddelta = (-0.5j * cgamma ** 2 * exp2phidelta * tanhr) * C
     if r > 0.01:
         dC_ddelta_over_r = dC_ddelta / r
     else:  # Taylor series for tanh(r)/r
         dC_ddelta_over_r = (
-            -0.5j * cgamma ** 2 * e2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)
+            -0.5j * cgamma ** 2 * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)
         ) * C
-
-    dC_dz = eidelta * (dC_dr - 1j * dC_ddelta_over_r) / 2
-    dC_dzc = np.exp(1j * delta) * (dC_dr + 1j * dC_ddelta_over_r) / 2
-
+    dC_dz = eideltac * (dC_dr - 1j * dC_ddelta_over_r) / 2
+    dC_dzc = eidelta * (dC_dr + 1j * dC_ddelta_over_r) / 2
     dC = np.array([dC_dgamma, dC_dgammac, dC_dphi, dC_dz, dC_dzc])
 
     # dmu
     dmu_dgamma = np.array([1.0, 0.0], dtype=np.complex128)
-    dmu_dgammac = np.array([e2phidelta * tanhr, -e2phidelta / coshr])
+    dmu_dgammac = np.array([exp2phidelta * tanhr, -eiphi / coshr])
     dmu_dphi = np.array(
-        [2j * cgamma * e2phidelta * tanhr, -1j * e2phidelta / coshr]
+        [2j * cgamma * exp2phidelta * tanhr, -1j * eiphi / coshr]
     )
     dmu_dr = np.array(
         [
-            cgamma * e2phidelta / coshr ** 2,
-            cgamma * e2phidelta * tanhr / coshr,
+            cgamma * exp2phidelta / coshr ** 2,
+            cgamma * eiphi * tanhr / coshr,
         ]
     )
-    dmu_ddelta = np.array([1j * cgamma * e2phidelta * tanhr, 0.0])
+    dmu_ddelta = np.array([1j * cgamma * exp2phidelta * tanhr, 0.0])
     if r > 0.01:
         dmu_ddelta_over_r = dmu_ddelta / r
     else:  # Taylor series for tanh(r)/r
         dmu_ddelta_over_r = np.array(
-            [1j * cgamma * e2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0]
+            [1j * cgamma * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0]
         )
-
-    dmu_dz = eidelta * (dmu_dr - 1j * dmu_ddelta_over_r) / 2
-    dmu_dzc = np.exp(1j * delta) * (dmu_dr + 1j * dmu_ddelta_over_r) / 2
-
+    dmu_dz = eideltac * (dmu_dr - 1j * dmu_ddelta_over_r) / 2
+    dmu_dzc = eidelta * (dmu_dr + 1j * dmu_ddelta_over_r) / 2
     dmu = np.stack((dmu_dgamma, dmu_dgammac, dmu_dphi, dmu_dz, dmu_dzc), axis=-1)
 
     # dSigma
@@ -138,32 +129,30 @@ def dC_dmu_dSigma(gamma, phi, z):
     dSigma_dgammac = np.array([[0.0, 0.0], [0.0, 0.0]], dtype=np.complex128)
     dSigma_dphi = np.array(
         [
-            [2j * e2phidelta * tanhr, -1j * e2phidelta / coshr],
-            [-1j * e2phidelta / coshr, 0.0],
+            [2j * exp2phidelta * tanhr, -1j * eiphi / coshr],
+            [-1j * eiphi / coshr, 0.0],
         ]
     )
     dSigma_dr = np.array(
         [
-            [e2phidelta / coshr ** 2, e2phidelta * tanhr / coshr],
-            [e2phidelta * tanhr / coshr, -eidelta / coshr ** 2],
+            [exp2phidelta / coshr ** 2, eiphi * tanhr / coshr],
+            [eiphi * tanhr / coshr, -eideltac / coshr ** 2],
         ]
     )
     dSigma_ddelta = np.array(
-        [[1j * e2phidelta * tanhr, 0.0], [0.0, 1j * eidelta * tanhr]]
+        [[1j * exp2phidelta * tanhr, 0.0], [0.0, 1j * eideltac * tanhr]]
     )
     if r > 0.01:
         dSigma_ddelta_over_r = dSigma_ddelta / r
     else:  # Taylor series for tanh(r)/r
         dSigma_ddelta_over_r = np.array(
             [
-                [1j * e2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0],
-                [0.0, 1j * eidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)],
+                [1j * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0],
+                [0.0, 1j * eideltac * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)],
             ]
         )
-
-    dSigma_dz = eidelta * (dSigma_dr - 1j * dSigma_ddelta_over_r) / 2
-    dSigma_dzc = np.exp(1j * delta) * (dSigma_dr + 1j * dSigma_ddelta_over_r) / 2
-
+    dSigma_dz = eideltac * (dSigma_dr - 1j * dSigma_ddelta_over_r) / 2
+    dSigma_dzc = eidelta * (dSigma_dr + 1j * dSigma_ddelta_over_r) / 2
     dSigma = np.stack((dSigma_dgamma, dSigma_dgammac, dSigma_dphi, dSigma_dz, dSigma_dzc), axis=-1)
 
     return dC, dmu, dSigma
