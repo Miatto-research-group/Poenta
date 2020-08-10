@@ -80,7 +80,7 @@ def GaussianTransformation(gamma, phi, z, Psi):
     return Psi_new, grad
 
 
-def kerr(k, cutoff: int, dtype: tf.dtypes.DType):
+def KerrDiagonal(k, cutoff: int, dtype: tf.dtypes.DType):
     """
     Returns the diagonal of the single-mode Kerr matrix
 

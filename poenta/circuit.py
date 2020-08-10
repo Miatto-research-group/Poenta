@@ -22,7 +22,7 @@ from collections import ChainMap
 from prettytable import PrettyTable
 
 from .nputils import init_complex, init_real
-from .tfutils import GaussianTransformation, kerr
+from .tfutils import GaussianTransformation, KerrDiagonal
 from .parameters import Parameters
 
 
@@ -57,7 +57,7 @@ class Circuit:
 
     def _layer_out(self, gamma: tf.Tensor, phi: tf.Tensor, zeta: tf.Tensor, k: tf.Tensor, layer_in: tf.Tensor) -> tf.Tensor:
         layer_out = GaussianTransformation(gamma, phi, zeta, layer_in)
-        return kerr(k, self.cutoff, self.dtype) * layer_out
+        return KerrDiagonal(k, self.cutoff, self.dtype) * layer_out
 
     @property  # lazy property
     def state_out(self) -> tf.Tensor:
