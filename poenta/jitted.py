@@ -14,10 +14,18 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-from numba import jit
+from numba import njit
+import numba as nb
 
+@nb.generated_jit
+def convert_scalar(arr):
+    """ helper function that turns 0d-arrays into scalars """
+    if isinstance(arr, nb.types.Array) and arr.ndim == 0:
+        return lambda arr: arr[()]
+    else:
+        return lambda arr: arr
 
-# @jit(nopython=True)
+@njit#(nb.types.Tuple((nb.complex128, nb.complex128[:], nb.complex128[:,:]))(nb.complex128, nb.float64, nb.complex128))
 def C_mu_Sigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     """
     Utility function to construct:
@@ -34,6 +42,9 @@ def C_mu_Sigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     Returns:
         C (complex), mu (complex array[2]), Sigma (complex array[2,2])
     """
+    z = convert_scalar(z)
+    phi = convert_scalar(phi)
+    gamma = convert_scalar(gamma)
     r = np.abs(z)
     delta = np.angle(z)
     exp2phidelta = np.exp(1j * (2 * phi + delta))
@@ -61,7 +72,7 @@ def C_mu_Sigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     return C, mu, Sigma
 
 
-# @jit(nopython=True)
+@njit
 def dC_dmu_dSigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     """
     Utility function to construct the gradient of:
@@ -78,6 +89,9 @@ def dC_dmu_dSigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     Returns:
         dC (complex array[5]), dmu (complex array[2,5]), dSigma (complex array[2,2,5])
     """
+    z = convert_scalar(z)
+    phi = convert_scalar(phi)
+    gamma = convert_scalar(gamma)
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
     r = np.abs(z)
     delta = np.angle(z)
@@ -162,7 +176,7 @@ def dC_dmu_dSigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     return dC, dmu, dSigma
 
 
-# @jit(nopython=True)
+@njit
 def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_state: np.array) -> np.array:
     """
     Directly constructs the transformed state recursively and exactly.
@@ -176,6 +190,11 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
     Returns:
         R (complex array[D,D]): the matrix whose 1st column is the transformed state
     """
+    z = convert_scalar(z)
+    phi = convert_scalar(phi)
+    gamma = convert_scalar(gamma)
+    cutoff = convert_scalar(cutoff)
+
     dtype = old_state.dtype
     # print(dtype)
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
@@ -207,7 +226,7 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
     return R
 
 
-# @jit(nopython=True)
+@njit
 def G_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dtype: np.dtype = np.complex128) -> np.array:
     """
     Constructs the Gaussian transformation recursively
@@ -222,6 +241,11 @@ def G_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dt
     Returns:
         G (complex array[cutoff]): the single-mode Gaussian transformation matrix
     """
+    z = convert_scalar(z)
+    phi = convert_scalar(phi)
+    gamma = convert_scalar(gamma)
+    cutoff = convert_scalar(cutoff)
+
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
     G = np.zeros((cutoff, cutoff), dtype=dtype)  # maybe numba cannot create array of zeros of type complex64
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
@@ -243,7 +267,7 @@ def G_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dt
     return G
 
 
-# @jit(nopython=True)
+@njit
 def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff:int, psi: np.array, G0: np.array, R: np.array) -> list:
     """
     Computes the gradient of the new state with respect to
@@ -262,6 +286,10 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff:int, p
                                     gamma, gamma*, phi, z, z*
     """
 
+    z = convert_scalar(z)
+    phi = convert_scalar(phi)
+    gamma = convert_scalar(gamma)
+    cutoff = convert_scalar(cutoff)
     # print('state in grad_newstate: ', psi)
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
     dC, dmu, dSigma = dC_dmu_dSigma(gamma, phi, z)
@@ -303,7 +331,7 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff:int, p
 
 # Extras
 
-@jit(nopython=True)
+# @jit(nopython=True)
 def approx_new_state(gamma, phi, z, old_state, order=None):
     """
     Constructs the transformed state recursively and exactly
