@@ -15,6 +15,8 @@
 
 import tensorflow as tf
 import numpy as np
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 

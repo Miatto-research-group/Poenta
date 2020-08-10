@@ -165,7 +165,7 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
         R (complex array[D,D]): the matrix whose 1st column is the transformed state
     """
     dtype = old_state.dtype
-    print(dtype)
+    # print(dtype)
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
 
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
@@ -250,7 +250,7 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff:int, p
                                     gamma, gamma*, phi, z, z*
     """
 
-    print('state in grad_newstate: ', psi)
+    # print('state in grad_newstate: ', psi)
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
     dC, dmu, dSigma = dC_dmu_dSigma(gamma, phi, z)
 

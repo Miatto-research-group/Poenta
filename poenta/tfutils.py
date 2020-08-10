@@ -58,21 +58,20 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
 
     dtype_c = state_in.dtype
     dtype_r = phi.dtype
-    print('about to call R')
+    # print('about to call R')
     R = tf.numpy_function(R_matrix, [gamma, phi, z, cutoff, state_in], dtype_c)
     state_out = R[:, 0]
-    print('called R')
+    # print('called R')
     # print(f"post: {gamma}\n {phi}\n {z}\n {state_in}\n {state_out}")
 
     def grad(dy):
         "Vector-Jacobian products for all the arguments (gamma, phi, z, Psi)"
         G = tf.numpy_function(G_matrix, [gamma, phi, z, cutoff], dtype_c)
         dPsi_dgamma, dPsi_dgammac, dPsi_dphi, dPsi_dz, dPsi_dzc = tf.numpy_function(
-            grad_newstate, [gamma, phi, z, cutoff, state_in, G[0], R], (dtype_c, dtype_c, dtype_r, dtype_c, dtype_c)
-        )
-        grad_gammac = tf.reduce_sum(dy * np.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
-        grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * np.conj(dPsi_dphi)))
-        grad_zc = tf.reduce_sum(dy * np.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
+            grad_newstate, [gamma, phi, z, cutoff, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c))
+        grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
+        grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
+        grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
         grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)  # NOTE: can we compute directly the product between G and dy?
         return grad_gammac, grad_phi, grad_zc, grad_Psic, None
 

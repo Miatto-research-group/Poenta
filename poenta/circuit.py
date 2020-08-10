@@ -54,7 +54,7 @@ class Circuit:
         self, gamma: tf.Tensor, phi: tf.Tensor, zeta: tf.Tensor, k: tf.Tensor, layer_in: tf.Tensor
     ) -> tf.Tensor:
         layer_out = GaussianTransformation(gamma, phi, zeta, layer_in)
-        return kerr(k, self.cutoff, self.config.dtype) * layer_out
+        return KerrDiagonal(k, self.cutoff, self.config.dtype) * layer_out
 
     @property  # lazy property
     def state_out(self) -> tf.Tensor:
