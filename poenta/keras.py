@@ -52,3 +52,11 @@ class QuantumDevice(tf.keras.Model):  # or Sequential?
         for layer in self._layers:
             input_tensor = layer(input_tensor)
         return input_tensor
+
+    @property
+    def num_layers(self):
+        return len(self._layers)
+
+    @property
+    def cutoff(self):
+        return self._layers[0].cutoff
