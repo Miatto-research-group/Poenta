@@ -298,18 +298,68 @@ def grad_newstate(gamma, phi, z, psi, G0, R):
 # Extras
 
 
+# @jit(nopython=True)
+# def approx_new_state(gamma, phi, z, old_state, order=None):
+#     """
+#     Constructs the transformed state recursively and exactly
+#     up to the Nth Fock amplitude, indicated by the keyword argument `order`
+
+#     Arguments:
+#         gamma (complex): displacement parameter
+#         phi (float): phase rotation parameter
+#         z (complex): squeezing parameter
+#         old_state (np.array(complex)): State to be transformed
+#         order (int): Fock space dimensionality of the exact approximation
+
+#     Returns:
+#         (np.array(complex)): the new state which is exact up to dimension `order`
+
+#     """
+#     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
+
+#     cutoff = old_state.shape[0]
+#     dtype = old_state.dtype
+#     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
+#     if order is None:
+#         order = cutoff
+
+#     R = np.zeros((cutoff, cutoff), dtype=dtype)
+#     G0 = np.zeros(cutoff, dtype=dtype)
+
+#     # first row of Transformation matrix
+#     G0[0] = C
+#     for n in range(1, cutoff):
+#         G0[n] = mu[1] / sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2]
+
+#     # first row of R matrix
+#     for n in range(order):
+#         R[0, n] = np.dot(G0[: cutoff - n], old_state)
+#         old_state = old_state[1:] * sqrt[1 : cutoff - n]
+
+#     # rest of R matrix
+#     for m in range(1, cutoff):
+#         for n in range(max(1, order - m)):
+#             R[m, n] = (
+#                 mu[0] / sqrt[m] * R[m - 1, n]
+#                 - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]
+#                 - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
+#             )
+
+#     return R[:, 0]
+
+
 @jit(nopython=True)
 def approx_new_state(gamma, phi, z, old_state, order=None):
     """
-    Constructs the transformed state recursively and exactly
-    up to the Nth Fock amplitude, indicated by the keyword argument `order`
+    Constructs an approximation of the transformed state by ignoring the 
+    squeezing contribution after a certain order.
 
     Arguments:
         gamma (complex): displacement parameter
         phi (float): phase rotation parameter
         z (complex): squeezing parameter
         old_state (np.array(complex)): State to be transformed
-        order (int): Fock space dimensionality of the exact approximation
+        order (int): order of the approximation
 
     Returns:
         (np.array(complex)): the new state which is exact up to dimension `order`
@@ -323,7 +373,7 @@ def approx_new_state(gamma, phi, z, old_state, order=None):
     if order is None:
         order = cutoff
 
-    R = np.zeros((cutoff, cutoff), dtype=dtype)
+    R = np.zeros((cutoff, order), dtype=dtype)
     G0 = np.zeros(cutoff, dtype=dtype)
 
     # first row of Transformation matrix
@@ -338,7 +388,7 @@ def approx_new_state(gamma, phi, z, old_state, order=None):
 
     # rest of R matrix
     for m in range(1, cutoff):
-        for n in range(max(1, order - m)):
+        for n in range(min(order-1, cutoff-m)):
             R[m, n] = (
                 mu[0] / sqrt[m] * R[m - 1, n]
                 - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]

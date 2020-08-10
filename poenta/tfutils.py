@@ -15,7 +15,8 @@
 
 import tensorflow as tf
 import numpy as np
-from .jitted import G_matrix, grad_newstate, R_matrix
+from .jitted import G_matrix, grad_newstate
+from .experimental import R_matrix
 
 
 def complex_initializer(dtype):
