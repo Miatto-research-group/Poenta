@@ -15,19 +15,26 @@
 
 import tensorflow as tf
 import numpy as np
+
 from .jitted import G_matrix, R_matrix, grad_newstate
+
+from .jitted import G_matrix, grad_newstate
+from .experimental import R_matrix
 
 
 def complex_initializer(dtype):
     f = tf.random_normal_initializer()
+
     def initializer(*args, dtype, **kwargs):
         real = f(*args, **kwargs)
         imag = f(*args, **kwargs)
         return tf.cast(tf.complex(real, imag), dtype)
     return initializer
 
+
 def real_initializer(dtype):
     f = tf.random_normal_initializer()
+
     def initializer(*args, dtype, **kwargs):
         real = f(*args, **kwargs)
         return tf.cast(real, dtype)
@@ -74,7 +81,6 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
         grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)  # NOTE: can we compute directly the product between G and dy?
         return grad_gammac, grad_phi, grad_zc, grad_Psic, None
-
     return state_out, grad
 
 

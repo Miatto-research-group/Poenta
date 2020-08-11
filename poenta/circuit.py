@@ -14,9 +14,11 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
-from tqdm.notebook import tqdm
+from rich.progress import Progress, BarColumn, TimeRemainingColumn, TextColumn
 from dataclasses import dataclass, field
+from collections import ChainMap
 from prettytable import PrettyTable
 
 from .nputils import init_complex, init_real
@@ -25,12 +27,9 @@ from .parameters import Parameters
 
 
 @dataclass
-class Config:
+class OptimizationConfig:
     state_in: np.array
     objective: np.array
-    dtype: tf.dtypes.DType
-    num_layers: int
-    steps: int
     optimizer: str = "Adam"
     random_seed: int = 666
     LR: float = 0.001
@@ -38,29 +37,34 @@ class Config:
 
 
 class Circuit:
-    def __init__(self, config: Config):
+    def __init__(self, num_layers: int, dtype: tf.dtypes.DType, config: OptimizationConfig):
+        self.dtype = dtype
+        self.set_optimization_config(config)
+
+        self.num_layers = num_layers
+        self._state_out = None
+        self._fidelity = None
+        self.cutoff = self.state_in.shape[0]
+        self.parameters = Parameters(num_layers=num_layers, dtype=dtype)
+
+    def set_optimization_config(self, config: OptimizationConfig):
         tf.random.set_seed(config.random_seed)
         np.random.seed(config.random_seed)
-        
         self.config = config
-        self.state_in = tf.cast(tf.constant(config.state_in), dtype=config.dtype)
-        self.objective = tf.cast(tf.constant(config.objective), dtype=config.dtype)
-        self._state_out = None
-        self.cutoff = self.state_in.shape[0]
-        self.optimizer = tf.optimizers.__dict__[config.optimizer](config.LR)
-        self.parameters = Parameters(num_layers=self.config.num_layers, dtype=config.dtype)
+        self.state_in = tf.cast(tf.constant(config.state_in), dtype=self.dtype)
+        self.objective = tf.cast(tf.constant(config.objective), dtype=self.dtype)
+        self.optimizer = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[config.optimizer](config.LR)
 
-    def _layer_out(
-        self, gamma: tf.Tensor, phi: tf.Tensor, zeta: tf.Tensor, k: tf.Tensor, layer_in: tf.Tensor
-    ) -> tf.Tensor:
+    def _layer_out(self, gamma: tf.Tensor, phi: tf.Tensor, zeta: tf.Tensor, k: tf.Tensor, layer_in: tf.Tensor) -> tf.Tensor:
         layer_out = GaussianTransformation(gamma, phi, zeta, layer_in)
-        return KerrDiagonal(k, self.cutoff, self.config.dtype) * layer_out
+        return KerrDiagonal(k, self.cutoff, self.dtype) * layer_out
+
 
     @property  # lazy property
     def state_out(self) -> tf.Tensor:
         if self._state_out is None:
             state = self.state_in
-            for i in range(self.config.num_layers):
+            for i in range(self.num_layers):
                 state = self._layer_out(
                     self.parameters.gamma[i],
                     self.parameters.phi[i],
@@ -71,51 +75,55 @@ class Circuit:
             self._state_out = state
         return self._state_out
 
-    @property
+    @property  # lazy property
     def fidelity(self):
-        return tf.abs(tf.reduce_sum(self.state_out * tf.math.conj(self.objective))) ** 2
+        if self._fidelity is None:
+            self._fidelity = tf.abs(tf.reduce_sum(self.state_out * tf.math.conj(self.objective))) ** 2
+        return self._fidelity
 
     def loss(self):
         return 1.0 - self.fidelity
 
     def minimize_step(self) -> float:
         self._state_out = None  # reset lazy output state
+        self._fidelity = None # reset lazy fidelity
         self.parameters.save()  # save current values before updating
         self.optimizer.minimize(self.loss, self.parameters.trainable)
         return self.loss()
 
-    def minimize(self) -> list:
-        loss_list = []
-        for i in tqdm(range(self.config.steps)):
-            try:
-                loss_list.append(self.minimize_step())
+    def minimize(self, steps) -> list:
+        loss_list = [] 
 
-                # LR scheduling
-                for threshold, new_LR in self.config.LR_schedule.items():
-                    if loss_list[-1] < threshold:
-                        self.optimizer.lr = new_LR
+        with Progress(
+            TextColumn("[progress.description] Iteration {task.fields[iteration]}/{task.total}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("Loss = {task.fields[loss]:.5f} | Time remaining: "),
+            TimeRemainingColumn()) as bar:
+            task = bar.add_task(description="Optimizing...", total=steps, iteration=0, loss = self.loss())
+            for i in range(steps):
+                try:
+                    loss_list.append(self.minimize_step())
 
-                if i % 10 == 0:
-                    print(
-                        f"Step {i}/{self.config.steps}: Fidelity = {100*(self.fidelity):.3f}%, LR = {self.optimizer.lr.numpy():.5f}",
-                        end="\r",
-                    )
+                    # LR scheduling
+                    for threshold, new_LR in self.config.LR_schedule.items():
+                        if loss_list[-1] < threshold:
+                            self.optimizer.lr = new_LR
 
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                print(f"other exception: {e}")
-                raise e
+                except KeyboardInterrupt:
+                    break
+                except Exception as e:
+                    print(f"other exception: {e}")
+                    raise e
+                bar.update(task, advance=1, refresh=True, iteration = i+1, loss = self.loss())
         return loss_list
 
     def __repr__(self):
         table = PrettyTable()
-        table.add_column("Layers",[self.config.num_layers])
+        table.add_column("Layers", [self.num_layers])
         table.add_column("Cutoff", [self.cutoff])
         table.add_column("Optimizer", [self.config.optimizer])
         trainable_pars = np.sum([p.shape for p in self.parameters.all])
         tot_pars = np.sum([p.shape for p in self.parameters.trainable])
         table.add_column("Params (trainable/tot)", [f"{trainable_pars}/{tot_pars}"])
-        
         return str(table)
-

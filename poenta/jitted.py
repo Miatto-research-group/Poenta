@@ -32,13 +32,11 @@ def C_mu_Sigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     1. C constant
     2. Mu vector
     3. Sigma matrix
-
     Arguments:
         gamma (complex): displacement parameter
         phi (float): phase rotation parameter
         z (complex): squeezing parameter
         dtype (numpy type): unused for now
-
     Returns:
         C (complex), mu (complex array[2]), Sigma (complex array[2,2])
     """
@@ -80,12 +78,10 @@ def dC_dmu_dSigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     2. Mu vector
     3. Sigma matrix
     with respect to gamma, gamma*, phi, z and z*
-
     Arguments:
         gamma (complex): displacement parameter
         phi (float): phase rotation parameter
         z (complex): squeezing parameter
-
     Returns:
         dC (complex array[5]), dmu (complex array[2,5]), dSigma (complex array[2,2,5])
     """
@@ -328,21 +324,19 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff:int, p
 
 
 
-
 # Extras
-
-# @jit(nopython=True)
+@njit
 def approx_new_state(gamma, phi, z, old_state, order=None):
     """
-    Constructs the transformed state recursively and exactly
-    up to the Nth Fock amplitude, indicated by the keyword argument `order`
+    Constructs an approximation of the transformed state by ignoring the 
+    squeezing contribution after a certain order.
 
     Arguments:
         gamma (complex): displacement parameter
         phi (float): phase rotation parameter
         z (complex): squeezing parameter
         old_state (np.array(complex)): State to be transformed
-        order (int): Fock space dimensionality of the exact approximation
+        order (int): order of the approximation
 
     Returns:
         (np.array(complex)): the new state which is exact up to dimension `order`
@@ -356,7 +350,7 @@ def approx_new_state(gamma, phi, z, old_state, order=None):
     if order is None:
         order = cutoff
 
-    R = np.zeros((cutoff, cutoff), dtype=dtype)
+    R = np.zeros((cutoff, order), dtype=dtype)
     G0 = np.zeros(cutoff, dtype=dtype)
 
     # first row of Transformation matrix
@@ -371,7 +365,7 @@ def approx_new_state(gamma, phi, z, old_state, order=None):
 
     # rest of R matrix
     for m in range(1, cutoff):
-        for n in range(max(1, order - m)):
+        for n in range(min(order-1, cutoff-m)):
             R[m, n] = (
                 mu[0] / sqrt[m] * R[m - 1, n]
                 - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]
