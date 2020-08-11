@@ -20,10 +20,9 @@ from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 
 
 class QuantumLayer(tf.keras.layers.Layer):
-    def __init__(self, num_modes: int, cutoff: int, realtype: tf.dtypes.DType, complextype: tf.dtypes.DType):
+    def __init__(self, num_modes: int, realtype: tf.dtypes.DType, complextype: tf.dtypes.DType):
         super().__init__()
         self.num_modes = num_modes
-        self.cutoff = cutoff
         self.realtype = realtype
         self.complextype = complextype
 
@@ -35,16 +34,29 @@ class QuantumLayer(tf.keras.layers.Layer):
         super().build(input_shape)  # is this necessary?
 
     def call(self, input):
-        gaussian_output = GaussianTransformation(self.gamma, self.phi, self.zeta, input, self.cutoff)
-        return KerrDiagonal(self.kappa, self.cutoff, dtype=self.complextype) * gaussian_output
+        gaussian_output = GaussianTransformation(self.gamma, self.phi, self.zeta, input)
+        output = KerrDiagonal(self.kappa, input.shape[1], dtype=self.complextype) * gaussian_output
+        output.set_shape(input.get_shape())
+        return output
 
 
-class QuantumDevice(tf.keras.Model):  # or Sequential?
-    def __init__(self, num_modes, num_layers, cutoff, dtype):
+class QuantumCircuit(tf.keras.Model):  # or Sequential?
+    def __init__(self, num_modes, num_layers, dtype):
         super().__init__(name="")
         self.realtype, self.complextype = real_complex_types(dtype)
-        self._layers = [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
+        self._layers = [QuantumLayer(num_modes, self.realtype, self.complextype) for _ in range(num_layers)]
         self._loss = 1.0
+        self._batch_size = None
+    
+    @property
+    def batch_size(self):
+        return self._batch_size
+
+    @batch_size.setter
+    def batch_size(self, batch_size):
+        self._batch_size = batch_size
+        for layer in self._layers:
+            layer.batch_size = batch_size
 
     def call(self, input_tensor):
         for layer in self._layers:

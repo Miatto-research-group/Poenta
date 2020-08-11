@@ -16,12 +16,12 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
-from typing import Callable
+from typing import Callable, Union, Iterable 
 from dataclasses import dataclass, field
 from collections import ChainMap
 from prettytable import PrettyTable
 
-from .keras import QuantumDevice, ProgressBarCallback, LossHistoryCallback
+from .keras import QuantumCircuit, ProgressBarCallback, LossHistoryCallback
 
 
 @dataclass
@@ -36,45 +36,59 @@ class OptimizationConfig:
 
 
 class Circuit:
-    def __init__(self, num_layers: int, cutoff: int, dtype: tf.dtypes.DType, config: OptimizationConfig):
-
+    def __init__(self, num_layers: int, dtype: tf.dtypes.DType):
         self.num_layers = num_layers
-        self.cutoff = cutoff
         self.dtype = dtype
-        self._circuit = QuantumDevice(num_modes=1, num_layers=num_layers, cutoff=cutoff, dtype=dtype)
-        self.set_optimization_config(config)
+        self._circuit = QuantumCircuit(num_modes=1, num_layers=num_layers, dtype=dtype)
+        self._random_seed = 665
+        self._inout_pairs: list = []
+        
+    @property
+    def random_seed(self):
+        return self._random_seed
 
-    def set_optimization_config(self, config: OptimizationConfig):
-        tf.random.set_seed(config.random_seed)
-        np.random.seed(config.random_seed)
-        self.config = config
-        self.state_in = tf.cast(tf.constant(config.state_in), dtype=self.dtype)
-        self.objective = tf.cast(tf.constant(config.objective), dtype=self.dtype)
-        self.optimizer = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[config.optimizer](config.LR)
-        self.loss_fn = config.loss_fn
-        self._circuit.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=[])
+    @random_seed.setter
+    def random_seed(self, n:int):
+        self._random_seed = n
+        tf.random.set_seed(n)
+        np.random.seed(n)
 
-    def reset(self):
-        self.circuit = QuantumDevice(num_modes=1, num_layers=num_layers, cutoff=cutoff, dtype=dtype)
-        self.set_optimization_config(self.config)
+    def set_input_output_pairs(self, *pairs:tuple):
+        states_in, states_out = list(zip(*pairs))
+        self._inout_pairs = (tf.cast(tf.constant(states_in), dtype=self.dtype), tf.cast(tf.constant(states_out), dtype=self.dtype))
+        self._circuit._batch_size = len(pairs)
 
-    def optimize(self, steps: int, epochs: int = 1) -> list:
+    def optimize(self, loss_fn: Callable, steps: int, epochs: int = 1, optimizer: Union[str, tf.optimizers.Optimizer] = "Adam", learning_rate:float = 0.001) -> LossHistoryCallback:
+        if isinstance(optimizer, str): 
+            try:
+                opt = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[optimizer.capitalize()](learning_rate)
+            except KeyError:
+                raise ValueError("Optimizer {optimizer} not found.")
+        elif isinstance(optimizer, tf.optimizers.Optimizer):
+            opt = optimizer
+        else:
+            raise ValueError("Optimizer can be a string (e.g. 'Adam') or an instance of an optimizer (e.g. `tf.optimizers.Adam(learning_rate=0.001)`).")
+        
+        self._circuit.compile(optimizer=opt, loss=loss_fn, metrics=[])
+
         def data():
             for i in range(steps):
-                yield (self.state_in, self.objective)
+                yield self._inout_pairs
 
         ds = tf.data.Dataset.from_generator(
             data,
             output_types=(self._circuit.complextype, self._circuit.complextype),
-            output_shapes=(tf.TensorShape([self.cutoff]), tf.TensorShape([self.cutoff])),
-        )
+            output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape))
+
         history = LossHistoryCallback()
         self._circuit.fit(
-            x=ds.repeat(epochs), batch_size=1, steps_per_epoch=steps, verbose = 0, callbacks=[ProgressBarCallback(steps, epochs), history], epochs=epochs, workers=1, use_multiprocessing=False
+            x=ds.repeat(epochs), batch_size=len(self._inout_pairs), steps_per_epoch=steps, verbose = 0, callbacks=[ProgressBarCallback(steps, epochs), history], epochs=epochs, workers=1, use_multiprocessing=False
         )
         return history
 
-    
+    def export_weights(self, filename:str):
+        pass
+
     # def __repr__(self):
     #     table = PrettyTable()
     #     table.add_column("Layers", [self.num_layers])
