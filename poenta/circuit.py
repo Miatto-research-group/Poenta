@@ -56,7 +56,7 @@ class Circuit:
         self.optimizer = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[config.optimizer](config.LR)
 
     def _layer_out(self, gamma: tf.Tensor, phi: tf.Tensor, zeta: tf.Tensor, k: tf.Tensor, layer_in: tf.Tensor) -> tf.Tensor:
-        layer_out = GaussianTransformation(gamma, phi, zeta, layer_in)
+        layer_out = GaussianTransformation(gamma, phi, zeta, layer_in, self.cutoff)
         return KerrDiagonal(k, self.cutoff, self.dtype) * layer_out
 
 

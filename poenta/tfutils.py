@@ -16,7 +16,7 @@
 import tensorflow as tf
 import numpy as np
 
-from .jitted import G_matrix, R_matrix, grad_newstate
+from .jitted import G_matrix, grad_newstate
 
 from .jitted import G_matrix, grad_newstate
 from .experimental import R_matrix
