@@ -15,11 +15,10 @@
 
 import numpy as np
 from numba import njit
-from .jitted import C_mu_Sigma
-
+from .jitted import C_mu_Sigma, convert_scalar
 
 @njit
-def R_matrix(gamma, phi, z, old_state):
+def R_matrix(gamma, phi, z, cutoff, old_state):
     """
     Directly constructs the transformed state recursively and exactly.
 
@@ -32,7 +31,11 @@ def R_matrix(gamma, phi, z, old_state):
     Returns:
         R (complex array[D,D]): the matrix whose 1st column is the transformed state
     """
-    cutoff = old_state.shape[0]
+    z = convert_scalar(z)
+    phi = convert_scalar(phi)
+    gamma = convert_scalar(gamma)
+    cutoff = convert_scalar(cutoff)
+
     dtype = old_state.dtype
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
 
@@ -55,8 +58,6 @@ def R_matrix(gamma, phi, z, old_state):
 
     # rest of R matrix
     for m in range(2, cutoff):
-        R[m, :-m] = (mu[0] * R[m - 1, :-m]
-                    - Sigma[0, 0] * sqrt[m - 1] * R[m - 2, :-m]
-                    - Sigma[0, 1] * R[m - 1, 1:-m+1]) / sqrt[m]
+        R[m, :-m] = (mu[0] * R[m - 1, :-m] - Sigma[0, 0] * sqrt[m - 1] * R[m - 2, :-m] - Sigma[0, 1] * R[m - 1, 1 : -m + 1]) / sqrt[m]
 
-    return R#[:, 0]
+    return R  # [:, 0]

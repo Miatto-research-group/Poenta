@@ -17,6 +17,7 @@ import numpy as np
 from numba import njit
 import numba as nb
 
+
 @nb.generated_jit
 def convert_scalar(arr):
     """ helper function that turns 0d-arrays into scalars """
@@ -25,8 +26,9 @@ def convert_scalar(arr):
     else:
         return lambda arr: arr
 
-@njit#(nb.types.Tuple((nb.complex128, nb.complex128[:], nb.complex128[:,:]))(nb.complex128, nb.float64, nb.complex128))
-def C_mu_Sigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
+
+@njit  # (nb.types.Tuple((nb.complex128, nb.complex128[:], nb.complex128[:,:]))(nb.complex128, nb.float64, nb.complex128))
+def C_mu_Sigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
     """
     Utility function to construct:
     1. C constant
@@ -51,27 +53,15 @@ def C_mu_Sigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     coshr = np.cosh(r)
     cgamma = np.conj(gamma)
 
-    C = np.exp(
-        -0.5 * np.abs(gamma) ** 2 - 0.5 * cgamma ** 2 * exp2phidelta * tanhr
-    ) / np.sqrt(coshr)
-    mu = np.array(
-        [
-            cgamma * exp2phidelta * tanhr + gamma,
-            -cgamma * eiphi / coshr,
-        ]
-    )
-    Sigma = np.array(
-        [
-            [exp2phidelta * tanhr, -eiphi / coshr],
-            [-eiphi / coshr, -np.exp(-1j * delta) * tanhr],
-        ]
-    )
+    C = np.exp(-0.5 * np.abs(gamma) ** 2 - 0.5 * cgamma ** 2 * exp2phidelta * tanhr) / np.sqrt(coshr)
+    mu = np.array([cgamma * exp2phidelta * tanhr + gamma, -cgamma * eiphi / coshr,])
+    Sigma = np.array([[exp2phidelta * tanhr, -eiphi / coshr], [-eiphi / coshr, -np.exp(-1j * delta) * tanhr],])
 
     return C, mu, Sigma
 
 
 @njit
-def dC_dmu_dSigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
+def dC_dmu_dSigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
     """
     Utility function to construct the gradient of:
     1. C constant
@@ -108,9 +98,7 @@ def dC_dmu_dSigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     if r > 0.01:
         dC_ddelta_over_r = dC_ddelta / r
     else:  # Taylor series for tanh(r)/r
-        dC_ddelta_over_r = (
-            -0.5j * cgamma ** 2 * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)
-        ) * C
+        dC_ddelta_over_r = (-0.5j * cgamma ** 2 * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)) * C
     dC_dz = eideltac * (dC_dr - 1j * dC_ddelta_over_r) / 2
     dC_dzc = eidelta * (dC_dr + 1j * dC_ddelta_over_r) / 2
     dC = np.array([dC_dgamma, dC_dgammac, dC_dphi, dC_dz, dC_dzc])
@@ -118,22 +106,13 @@ def dC_dmu_dSigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     # dmu
     dmu_dgamma = np.array([1.0, 0.0], dtype=np.complex128)
     dmu_dgammac = np.array([exp2phidelta * tanhr, -eiphi / coshr])
-    dmu_dphi = np.array(
-        [2j * cgamma * exp2phidelta * tanhr, -1j * eiphi / coshr]
-    )
-    dmu_dr = np.array(
-        [
-            cgamma * exp2phidelta / coshr ** 2,
-            cgamma * eiphi * tanhr / coshr,
-        ]
-    )
+    dmu_dphi = np.array([2j * cgamma * exp2phidelta * tanhr, -1j * eiphi / coshr])
+    dmu_dr = np.array([cgamma * exp2phidelta / coshr ** 2, cgamma * eiphi * tanhr / coshr,])
     dmu_ddelta = np.array([1j * cgamma * exp2phidelta * tanhr, 0.0])
     if r > 0.01:
         dmu_ddelta_over_r = dmu_ddelta / r
     else:  # Taylor series for tanh(r)/r
-        dmu_ddelta_over_r = np.array(
-            [1j * cgamma * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0]
-        )
+        dmu_ddelta_over_r = np.array([1j * cgamma * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0])
     dmu_dz = eideltac * (dmu_dr - 1j * dmu_ddelta_over_r) / 2
     dmu_dzc = eidelta * (dmu_dr + 1j * dmu_ddelta_over_r) / 2
     dmu = np.stack((dmu_dgamma, dmu_dgammac, dmu_dphi, dmu_dz, dmu_dzc), axis=-1)
@@ -141,29 +120,14 @@ def dC_dmu_dSigma(gamma: np.complex, phi:np.float, z:np.complex) -> tuple:
     # dSigma
     dSigma_dgamma = np.array([[0.0, 0.0], [0.0, 0.0]], dtype=np.complex128)
     dSigma_dgammac = np.array([[0.0, 0.0], [0.0, 0.0]], dtype=np.complex128)
-    dSigma_dphi = np.array(
-        [
-            [2j * exp2phidelta * tanhr, -1j * eiphi / coshr],
-            [-1j * eiphi / coshr, 0.0],
-        ]
-    )
-    dSigma_dr = np.array(
-        [
-            [exp2phidelta / coshr ** 2, eiphi * tanhr / coshr],
-            [eiphi * tanhr / coshr, -eideltac / coshr ** 2],
-        ]
-    )
-    dSigma_ddelta = np.array(
-        [[1j * exp2phidelta * tanhr, 0.0], [0.0, 1j * eideltac * tanhr]]
-    )
+    dSigma_dphi = np.array([[2j * exp2phidelta * tanhr, -1j * eiphi / coshr], [-1j * eiphi / coshr, 0.0],])
+    dSigma_dr = np.array([[exp2phidelta / coshr ** 2, eiphi * tanhr / coshr], [eiphi * tanhr / coshr, -eideltac / coshr ** 2],])
+    dSigma_ddelta = np.array([[1j * exp2phidelta * tanhr, 0.0], [0.0, 1j * eideltac * tanhr]])
     if r > 0.01:
         dSigma_ddelta_over_r = dSigma_ddelta / r
     else:  # Taylor series for tanh(r)/r
         dSigma_ddelta_over_r = np.array(
-            [
-                [1j * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0],
-                [0.0, 1j * eideltac * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)],
-            ]
+            [[1j * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0], [0.0, 1j * eideltac * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)],]
         )
     dSigma_dz = eideltac * (dSigma_dr - 1j * dSigma_ddelta_over_r) / 2
     dSigma_dzc = eidelta * (dSigma_dr + 1j * dSigma_ddelta_over_r) / 2
@@ -213,11 +177,7 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
     # rest of R matrix
     for m in range(1, cutoff):
         for n in range(cutoff - m):
-            R[m, n] = (
-                mu[0] / sqrt[m] * R[m - 1, n]
-                - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]
-                - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
-            )
+            R[m, n] = mu[0] / sqrt[m] * R[m - 1, n] - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n] - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
 
     return R
 
@@ -255,16 +215,14 @@ def G_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dt
     for m in range(cutoff):
         for n in range(cutoff - 1):
             G[m, n + 1] = (
-                mu[1] / sqrt[n + 1] * G[m, n]
-                - Sigma[1, 0] * sqrt[m] / sqrt[n + 1] * G[m - 1, n]
-                - Sigma[1, 1] * sqrt[n] / sqrt[n + 1] * G[m, n - 1]
+                mu[1] / sqrt[n + 1] * G[m, n] - Sigma[1, 0] * sqrt[m] / sqrt[n + 1] * G[m - 1, n] - Sigma[1, 1] * sqrt[n] / sqrt[n + 1] * G[m, n - 1]
             )
 
     return G
 
 
 @njit
-def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff:int, psi: np.array, G0: np.array, R: np.array) -> list:
+def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, psi: np.array, G0: np.array, R: np.array) -> list:
     """
     Computes the gradient of the new state with respect to
     gamma, gamma*, phi, z, z* but not with respect to the old state
@@ -299,9 +257,7 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff:int, p
     # grad of first row of Transformation matrix
     dG0[0] = dC
     for n in range(cutoff - 1):
-        dG0[n + 1] = (
-            dmu[1] * G0[n] + mu[1] * dG0[n] - dSigma[1, 1] * sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n] * dG0[n - 1]
-        ) / sqrt[n + 1]
+        dG0[n + 1] = (dmu[1] * G0[n] + mu[1] * dG0[n] - dSigma[1, 1] * sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n] * dG0[n - 1]) / sqrt[n + 1]
 
     # first row of dR matrix
     for n in range(cutoff):
@@ -321,7 +277,6 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff:int, p
             ) / sqrt[m + 1]
 
     return list(np.transpose(dR[:, 0]))
-
 
 
 # Extras
@@ -365,11 +320,7 @@ def approx_new_state(gamma, phi, z, old_state, order=None):
 
     # rest of R matrix
     for m in range(1, cutoff):
-        for n in range(min(order-1, cutoff-m)):
-            R[m, n] = (
-                mu[0] / sqrt[m] * R[m - 1, n]
-                - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]
-                - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
-            )
+        for n in range(min(order - 1, cutoff - m)):
+            R[m, n] = mu[0] / sqrt[m] * R[m - 1, n] - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n] - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
 
     return R[:, 0]

@@ -29,6 +29,7 @@ def complex_initializer(dtype):
         real = f(*args, **kwargs)
         imag = f(*args, **kwargs)
         return tf.cast(tf.complex(real, imag), dtype)
+
     return initializer
 
 
@@ -38,7 +39,20 @@ def real_initializer(dtype):
     def initializer(*args, dtype, **kwargs):
         real = f(*args, **kwargs)
         return tf.cast(real, dtype)
+
     return initializer
+
+
+def real_complex_types(dtype: tf.dtypes.DType):
+    if dtype == tf.complex128:
+        realtype = tf.float64
+        complextype = tf.complex128
+    elif dtype == tf.complex64:
+        realtype = tf.float32
+        complextype = tf.complex64
+    else:
+        raise ValueError(f"dtype can be only tf.complex128 or tf.complex64, not {dtype}")
+    return realtype, complextype
 
 
 @tf.custom_gradient
@@ -75,12 +89,14 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
         "Vector-Jacobian products for all the arguments (gamma, phi, z, Psi)"
         G = tf.numpy_function(G_matrix, [gamma, phi, z, cutoff], dtype_c)
         dPsi_dgamma, dPsi_dgammac, dPsi_dphi, dPsi_dz, dPsi_dzc = tf.numpy_function(
-            grad_newstate, [gamma, phi, z, cutoff, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c))
+            grad_newstate, [gamma, phi, z, cutoff, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c)
+        )
         grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
         grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)  # NOTE: can we compute directly the product between G and dy?
         return grad_gammac, grad_phi, grad_zc, grad_Psic, None
+
     return state_out, grad
 
 
