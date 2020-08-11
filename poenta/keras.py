@@ -43,6 +43,7 @@ class QuantumLayer(tf.keras.layers.Layer):
         return KerrDiagonal(self.kappa, self.cutoff, dtype=self.complextype) * gaussian_output
 
 
+
 class QuantumDevice(tf.keras.Model):  # or Sequential?
     def __init__(self, num_modes, num_layers, cutoff, dtype):
         super().__init__(name="")
@@ -52,3 +53,12 @@ class QuantumDevice(tf.keras.Model):  # or Sequential?
         for layer in self._layers:
             input_tensor = layer(input_tensor)
         return input_tensor
+      
+    @property
+    def num_layers(self):
+        return len(self._layers)
+
+    @property
+    def cutoff(self):
+        return self._layers[0].cutoff
+
