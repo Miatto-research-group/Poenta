@@ -31,6 +31,7 @@ class Circuit:
 
         self.set_random_seed(665)
         self._inout_pairs: tuple
+        self._cumul_steps: int = 0
         self.__should_compile = True
         self.__schash = None
 
@@ -101,11 +102,14 @@ class Circuit:
             batch_size=len(self._inout_pairs),
             steps_per_epoch=steps,
             verbose=0,
-            callbacks=[ProgressBarCallback(steps), history],
+            callbacks=[ProgressBarCallback(steps, self._cumul_steps), history],
             max_queue_size=20,
             workers=1,
             use_multiprocessing=False,
         )
+
+        self._cumul_steps += steps
+        
         return history
 
     def export_weights(self, filename: str):

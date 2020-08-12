@@ -61,12 +61,13 @@ class QuantumCircuit(tf.keras.Sequential):
 
 
 class ProgressBarCallback(tf.keras.callbacks.Callback):
-    def __init__(self, steps: int):
+    def __init__(self, steps: int, init_step: int):
         super().__init__()
         self.steps = steps
+        self.init_step = init_step
         self.task = None
         self.bar = Progress(
-            TextColumn("Iteration {task.fields[iteration]}/{task.total}"),
+            TextColumn("Iteration {task.fields[iteration]}/{task.fields[cumul]}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TextColumn("Loss = {task.fields[loss]:.5f} | Time remaining: "),
@@ -78,12 +79,8 @@ class ProgressBarCallback(tf.keras.callbacks.Callback):
     def on_train_begin(self, logs=None):
         self.current_avg_loss = self.model._loss
         self.task = self.task = self.bar.add_task(
-            description="Optimizing...", total=self.steps, iteration=0, loss=self.current_avg_loss
+            description="Optimizing...", total=self.steps, iteration=self.init_step, loss=self.current_avg_loss, cumul=self.steps+self.init_step
         )
-
-    # def on_train_end(self, logs=None):
-    #     self.model._loss = self.current_loss(self.steps)
-    #     self.bar.remove_task(self.task)
 
     def on_train_batch_begin(self, batch, logs=None):
         self.prev_avg_loss = self.current_avg_loss
@@ -91,7 +88,7 @@ class ProgressBarCallback(tf.keras.callbacks.Callback):
     def on_train_batch_end(self, batch, logs=None):
         self.current_avg_loss = logs["loss"]
         self.model._loss = self.current_loss(batch)
-        self.bar.update(self.task, advance=1, refresh=True, iteration=batch + 1, loss=self.model._loss)
+        self.bar.update(self.task, advance=1, refresh=True, iteration=batch + 1 + self.init_step, loss=self.model._loss)
 
     def current_loss(self, batch):
         return (batch + 1) * self.current_avg_loss - batch * self.prev_avg_loss
