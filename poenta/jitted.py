@@ -121,13 +121,18 @@ def dC_dmu_dSigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
     dSigma_dgamma = np.array([[0.0, 0.0], [0.0, 0.0]], dtype=np.complex128)
     dSigma_dgammac = np.array([[0.0, 0.0], [0.0, 0.0]], dtype=np.complex128)
     dSigma_dphi = np.array([[2j * exp2phidelta * tanhr, -1j * eiphi / coshr], [-1j * eiphi / coshr, 0.0],])
-    dSigma_dr = np.array([[exp2phidelta / coshr ** 2, eiphi * tanhr / coshr], [eiphi * tanhr / coshr, -eideltac / coshr ** 2],])
+    dSigma_dr = np.array(
+        [[exp2phidelta / coshr ** 2, eiphi * tanhr / coshr], [eiphi * tanhr / coshr, -eideltac / coshr ** 2],]
+    )
     dSigma_ddelta = np.array([[1j * exp2phidelta * tanhr, 0.0], [0.0, 1j * eideltac * tanhr]])
     if r > 0.01:
         dSigma_ddelta_over_r = dSigma_ddelta / r
     else:  # Taylor series for tanh(r)/r
         dSigma_ddelta_over_r = np.array(
-            [[1j * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0], [0.0, 1j * eideltac * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)],]
+            [
+                [1j * exp2phidelta * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0), 0.0],
+                [0.0, 1j * eideltac * (1 - r ** 2 / 3.0 + 2 * r ** 4 / 15.0)],
+            ]
         )
     dSigma_dz = eideltac * (dSigma_dr - 1j * dSigma_ddelta_over_r) / 2
     dSigma_dzc = eidelta * (dSigma_dr + 1j * dSigma_ddelta_over_r) / 2
@@ -177,13 +182,19 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
     # rest of R matrix
     for m in range(1, cutoff):
         for n in range(cutoff - m):
-            R[m, n] = mu[0] / sqrt[m] * R[m - 1, n] - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n] - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
+            R[m, n] = (
+                mu[0] / sqrt[m] * R[m - 1, n]
+                - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]
+                - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
+            )
 
     return R
 
 
 @njit
-def G_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dtype: np.dtype = np.complex128) -> np.array:
+def G_matrix(
+    gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dtype: np.dtype = np.complex128
+) -> np.array:
     """
     Constructs the Gaussian transformation recursively
 
@@ -215,14 +226,18 @@ def G_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dt
     for m in range(cutoff):
         for n in range(cutoff - 1):
             G[m, n + 1] = (
-                mu[1] / sqrt[n + 1] * G[m, n] - Sigma[1, 0] * sqrt[m] / sqrt[n + 1] * G[m - 1, n] - Sigma[1, 1] * sqrt[n] / sqrt[n + 1] * G[m, n - 1]
+                mu[1] / sqrt[n + 1] * G[m, n]
+                - Sigma[1, 0] * sqrt[m] / sqrt[n + 1] * G[m - 1, n]
+                - Sigma[1, 1] * sqrt[n] / sqrt[n + 1] * G[m, n - 1]
             )
 
     return G
 
 
 @njit
-def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, psi: np.array, G0: np.array, R: np.array) -> list:
+def grad_newstate(
+    gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, psi: np.array, G0: np.array, R: np.array
+) -> list:
     """
     Computes the gradient of the new state with respect to
     gamma, gamma*, phi, z, z* but not with respect to the old state
@@ -257,7 +272,9 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, 
     # grad of first row of Transformation matrix
     dG0[0] = dC
     for n in range(cutoff - 1):
-        dG0[n + 1] = (dmu[1] * G0[n] + mu[1] * dG0[n] - dSigma[1, 1] * sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n] * dG0[n - 1]) / sqrt[n + 1]
+        dG0[n + 1] = (
+            dmu[1] * G0[n] + mu[1] * dG0[n] - dSigma[1, 1] * sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n] * dG0[n - 1]
+        ) / sqrt[n + 1]
 
     # first row of dR matrix
     for n in range(cutoff):
@@ -321,6 +338,10 @@ def approx_new_state(gamma, phi, z, old_state, order=None):
     # rest of R matrix
     for m in range(1, cutoff):
         for n in range(min(order - 1, cutoff - m)):
-            R[m, n] = mu[0] / sqrt[m] * R[m - 1, n] - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n] - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
+            R[m, n] = (
+                mu[0] / sqrt[m] * R[m - 1, n]
+                - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]
+                - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
+            )
 
     return R[:, 0]

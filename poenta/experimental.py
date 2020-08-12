@@ -18,6 +18,7 @@ from numpy import expand_dims as ed
 from numba import njit
 from .jitted import C_mu_Sigma, dC_dmu_dSigma, convert_scalar
 
+
 @njit(fastmath=True)
 def R_matrix(gamma, phi, z, old_state):
     """
@@ -38,7 +39,7 @@ def R_matrix(gamma, phi, z, old_state):
     z = convert_scalar(z)
     phi = convert_scalar(phi)
     gamma = convert_scalar(gamma)
-    
+
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
 
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
@@ -60,10 +61,13 @@ def R_matrix(gamma, phi, z, old_state):
 
     # rest of R matrix
     for m in range(2, cutoff):
-        R[:, m, :-m] = (mu[0] * R[:, m - 1, :-m] - Sigma[0, 0] * sqrt[m - 1] * R[:, m - 2, :-m] - Sigma[0, 1] * R[:, m - 1, 1 : -m + 1]) / sqrt[m]
+        R[:, m, :-m] = (
+            mu[0] * R[:, m - 1, :-m]
+            - Sigma[0, 0] * sqrt[m - 1] * R[:, m - 2, :-m]
+            - Sigma[0, 1] * R[:, m - 1, 1 : -m + 1]
+        ) / sqrt[m]
 
     return R
-
 
 
 # @njit
@@ -90,10 +94,10 @@ def R_matrix(gamma, phi, z, old_state):
 #     z = convert_scalar(z)
 #     phi = convert_scalar(phi)
 #     gamma = convert_scalar(gamma)
-    
+
 #     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
 #     dC, dmu, dSigma = dC_dmu_dSigma(gamma, phi, z)
-    
+
 #     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
 
 #     dR = np.zeros((batch, cutoff, cutoff, 5), dtype=dtype)
@@ -106,7 +110,7 @@ def R_matrix(gamma, phi, z, old_state):
 
 #     # first row of dR matrix
 #     for n in range(cutoff):
-#         dR[:,0, n] = np.dot(psi, dG0[: cutoff - n]) 
+#         dR[:,0, n] = np.dot(psi, dG0[: cutoff - n])
 #         psi = psi[:,1:] * sqrt[1 : cutoff - n]
 
 #     # rest of dR matrix
@@ -126,14 +130,14 @@ def R_matrix(gamma, phi, z, old_state):
 
 @njit(fastmath=True)
 def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, psi: np.array, G0: np.array, R: np.array) -> list:
-    
+
     batch, cutoff = psi.shape
     dtype = psi.dtype
 
     z = convert_scalar(z)
     phi = convert_scalar(phi)
     gamma = convert_scalar(gamma)
-    
+
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
     dC, dmu, dSigma = dC_dmu_dSigma(gamma, phi, z)
 
@@ -144,7 +148,12 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, psi: np.array
     # first row of Transformation matrix
     dG0[0] = dC
     for n in range(1, cutoff):
-        dG0[n] = dmu[1] / sqrt[n] * G0[n - 1] - dSigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2] + mu[1] / sqrt[n] * dG0[n - 1] - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * dG0[n - 2]
+        dG0[n] = (
+            dmu[1] / sqrt[n] * G0[n - 1]
+            - dSigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2]
+            + mu[1] / sqrt[n] * dG0[n - 1]
+            - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * dG0[n - 2]
+        )
 
     # first row of dR matrix
     for n in range(cutoff):
@@ -152,10 +161,22 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, psi: np.array
         psi = psi[:, 1:] * sqrt[1 : cutoff - n]
 
     # second row of dR matrix
-    dR[:, 1, :-1] =  ed(R[:, 0, :-1], 2) * ed(ed(dmu[0], 0), 0) - ed(R[:, 0, 1:], 2) * ed(ed(dSigma[0, 1], 0), 0) + mu[0] * dR[:, 0, :-1] - Sigma[0, 1] * dR[:, 0, 1:]
+    dR[:, 1, :-1] = (
+        ed(R[:, 0, :-1], 2) * ed(ed(dmu[0], 0), 0)
+        - ed(R[:, 0, 1:], 2) * ed(ed(dSigma[0, 1], 0), 0)
+        + mu[0] * dR[:, 0, :-1]
+        - Sigma[0, 1] * dR[:, 0, 1:]
+    )
 
     # rest of R matrix
     for m in range(2, cutoff):
-        dR[:, m, :-m] = (ed(R[:, m - 1, :-m], 2) * ed(ed(dmu[0], 0), 1) - sqrt[m - 1] * ed(R[:, m - 2, :-m], 2) * ed(ed(dSigma[0, 0], 0), 1) - ed(R[:, m - 1, 1 : -m + 1], 2) * ed(ed(dSigma[0, 1], 0), 0) + mu[0] * dR[:, m - 1, :-m] - Sigma[0, 0] * sqrt[m - 1] * dR[:, m - 2, :-m] - Sigma[0, 1] * dR[:, m - 1, 1 : -m + 1]) / sqrt[m]
+        dR[:, m, :-m] = (
+            ed(R[:, m - 1, :-m], 2) * ed(ed(dmu[0], 0), 1)
+            - sqrt[m - 1] * ed(R[:, m - 2, :-m], 2) * ed(ed(dSigma[0, 0], 0), 1)
+            - ed(R[:, m - 1, 1 : -m + 1], 2) * ed(ed(dSigma[0, 1], 0), 0)
+            + mu[0] * dR[:, m - 1, :-m]
+            - Sigma[0, 0] * sqrt[m - 1] * dR[:, m - 2, :-m]
+            - Sigma[0, 1] * dR[:, m - 1, 1 : -m + 1]
+        ) / sqrt[m]
 
-    return list(np.transpose(dR[:,:, 0], (2, 0, 1)))
+    return list(np.transpose(dR[:, :, 0], (2, 0, 1)))

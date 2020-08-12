@@ -78,7 +78,7 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
 
     dtype_c = state_in.dtype
     dtype_r = phi.dtype
-    
+
     R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
     state_out = R[..., 0]
     # print('called R')
@@ -93,7 +93,9 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
         grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
-        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)  # NOTE: can we compute directly the product between G and dy?
+        grad_Psic = tf.linalg.matvec(
+            G, dy, adjoint_a=True
+        )  # NOTE: can we compute directly the product between G and dy?
         return grad_gammac, grad_phi, grad_zc, grad_Psic
 
     return state_out, grad

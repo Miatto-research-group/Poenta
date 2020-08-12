@@ -16,7 +16,7 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
-from typing import Callable, Union, Iterable 
+from typing import Callable, Union, Iterable
 from dataclasses import dataclass, field
 from collections import ChainMap
 from prettytable import PrettyTable
@@ -44,31 +44,39 @@ class Circuit:
         self._inout_pairs: tuple
         self.__should_compile = True
         self.__schash = None
-        
+
     @property
     def random_seed(self):
         return self._random_seed
 
     @random_seed.setter
-    def random_seed(self, n:int):
+    def random_seed(self, n: int):
         self._random_seed = n
         tf.random.set_seed(n)
         np.random.seed(n)
 
-    def set_input_output_pairs(self, *pairs:tuple):
+    def set_input_output_pairs(self, *pairs: tuple):
         states_in, states_out = list(zip(*pairs))
-        self._inout_pairs = (tf.convert_to_tensor(states_in, dtype=self.dtype), tf.convert_to_tensor(states_out, dtype=self.dtype))
+        self._inout_pairs = (
+            tf.convert_to_tensor(states_in, dtype=self.dtype),
+            tf.convert_to_tensor(states_out, dtype=self.dtype),
+        )
         self._circuit._batch_size = len(pairs)
 
     def should_compile(self, optimizer, learning_rate):
         _hash = hash((hash(optimizer), hash(learning_rate)))
-        self.__should_compile = (self.__schash != _hash)
+        self.__should_compile = self.__schash != _hash
         self.__schash = _hash
         return self.__should_compile
 
-
-    def optimize(self, loss_fn: Callable, steps: int, epochs: int = 1, optimizer: Union[str, tf.optimizers.Optimizer] = "Adam", learning_rate:float = 0.001) -> LossHistoryCallback:
-        if isinstance(optimizer, str): 
+    def optimize(
+        self,
+        loss_fn: Callable,
+        steps: int,
+        optimizer: Union[str, tf.optimizers.Optimizer] = "Adam",
+        learning_rate: float = 0.001,
+    ) -> LossHistoryCallback:
+        if isinstance(optimizer, str):
             try:
                 opt = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[optimizer.capitalize()](learning_rate)
             except KeyError:
@@ -76,8 +84,10 @@ class Circuit:
         elif isinstance(optimizer, tf.optimizers.Optimizer):
             opt = optimizer
         else:
-            raise ValueError("Optimizer can be a string (e.g. 'Adam') or an instance of an optimizer (e.g. `tf.optimizers.Adam(learning_rate=0.001)`).")
-        
+            raise ValueError(
+                "Optimizer can be a string (e.g. 'Adam') or an instance of an optimizer (e.g. `tf.optimizers.Adam(learning_rate=0.001)`)."
+            )
+
         if self.should_compile(optimizer, learning_rate):
             self._circuit.compile(optimizer=opt, loss=loss_fn, metrics=[])
 
@@ -88,15 +98,23 @@ class Circuit:
         ds = tf.data.Dataset.from_generator(
             data,
             output_types=(self._circuit.complextype, self._circuit.complextype),
-            output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape))
+            output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape),
+        )
 
         history = LossHistoryCallback()
         self._circuit.fit(
-            x=ds.repeat(epochs), batch_size=len(self._inout_pairs), steps_per_epoch=steps, verbose = 0, callbacks=[ProgressBarCallback(steps, epochs), history], epochs=epochs, max_queue_size=40, workers=1, use_multiprocessing=False
+            x=ds,
+            batch_size=len(self._inout_pairs),
+            steps_per_epoch=steps,
+            verbose=0,
+            callbacks=[ProgressBarCallback(steps), history],
+            max_queue_size=10,
+            workers=1,
+            use_multiprocessing=False,
         )
         return history
 
-    def export_weights(self, filename:str):
+    def export_weights(self, filename: str):
         pass
 
     # def __repr__(self):
