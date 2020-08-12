@@ -27,29 +27,29 @@ class Circuit:
     def __init__(self, num_layers: int, dtype: tf.dtypes.DType):
         self.num_layers = num_layers
         self.dtype = dtype
-        self._circuit = QuantumCircuit(num_modes=1, num_layers=num_layers, dtype=dtype)
-        self._random_seed = 665
+        self._circuit: QuantumCircuit
+
+        self.set_random_seed(665)
         self._inout_pairs: tuple
         self.__should_compile = True
         self.__schash = None
 
-    @property
-    def random_seed(self):
-        return self._random_seed
-
-    @random_seed.setter
-    def random_seed(self, n: int):
-        self._random_seed = n
+    def set_random_seed(self, n: int):
         tf.random.set_seed(n)
         np.random.seed(n)
 
     def set_input_output_pairs(self, *pairs: tuple):
         states_in, states_out = list(zip(*pairs))
-        self._inout_pairs = (
-            tf.convert_to_tensor(states_in, dtype=self.dtype),
-            tf.convert_to_tensor(states_out, dtype=self.dtype),
+        states_in = tf.convert_to_tensor(states_in, dtype=self.dtype)
+        states_out = tf.convert_to_tensor(states_out, dtype=self.dtype)
+        self._inout_pairs = (states_in, states_out)
+        self._circuit = QuantumCircuit(
+            num_modes=1,
+            num_layers=self.num_layers,
+            batch_size=states_in.shape[0],
+            cutoff=states_in.shape[1],
+            dtype=self.dtype,
         )
-        self._circuit._batch_size = len(pairs)
 
     def should_compile(self, optimizer, learning_rate):
         _hash = hash((hash(optimizer), hash(learning_rate)))
@@ -66,11 +66,15 @@ class Circuit:
     ) -> LossHistoryCallback:
         if isinstance(optimizer, str):
             try:
-                opt = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[optimizer.lower().capitalize()](
-                    learning_rate
-                )
-            except KeyError:
-                raise ValueError("Optimizer {optimizer} not found.")
+                opt = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[optimizer](learning_rate)
+            except KeyError as e:
+                guess = [
+                    opt
+                    for opt in ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)
+                    if optimizer.lower() in opt.lower() or opt.lower() in optimizer.lower()
+                ]
+                e.args = (f"Optimizer {optimizer} not found. Did you mean one of the following: {guess}?",)
+                raise e
         elif isinstance(optimizer, tf.optimizers.Optimizer):
             opt = optimizer
         else:

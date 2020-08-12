@@ -20,9 +20,10 @@ from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 
 
 class QuantumLayer(tf.keras.layers.Layer):
-    def __init__(self, num_modes: int, realtype: tf.dtypes.DType, complextype: tf.dtypes.DType):
+    def __init__(self, num_modes: int, cutoff: int, realtype: tf.dtypes.DType, complextype: tf.dtypes.DType):
         super().__init__()
         self.num_modes = num_modes
+        self.cutoff = cutoff
         self.realtype = realtype
         self.complextype = complextype
 
@@ -42,39 +43,21 @@ class QuantumLayer(tf.keras.layers.Layer):
         super().build(input_shape)  # is this necessary?
 
     def call(self, input):
-        input = tf.convert_to_tensor(input)
         gaussian_output = GaussianTransformation(self.gamma, self.phi, self.zeta, input)
-        output = KerrDiagonal(self.kappa, input.shape[1], dtype=self.complextype)[None, :] * gaussian_output
+        output = KerrDiagonal(self.kappa, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output
         output.set_shape(input.get_shape())
         return output
 
 
-class QuantumCircuit(tf.keras.Model):  # or Sequential?
-    def __init__(self, num_modes, num_layers, dtype):
-        super().__init__(name="")
+class QuantumCircuit(tf.keras.Sequential):
+    def __init__(self, num_modes: int, num_layers: int, batch_size: int, cutoff: int, dtype: tf.DType):
         self.realtype, self.complextype = real_complex_types(dtype)
-        self._layers = [QuantumLayer(num_modes, self.realtype, self.complextype) for _ in range(num_layers)]
         self._loss = 1.0
         self._batch_size = None
-
-    @property
-    def batch_size(self):
-        return self._batch_size
-
-    @batch_size.setter
-    def batch_size(self, batch_size):
-        self._batch_size = batch_size
-        for layer in self._layers:
-            layer.batch_size = batch_size
-
-    def call(self, input_tensor):
-        for layer in self._layers:
-            input_tensor = layer(input_tensor)
-        return input_tensor
-
-    @property
-    def num_layers(self):
-        return len(self._layers)
+        super().__init__(
+            [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
+            + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
+        )
 
 
 class ProgressBarCallback(tf.keras.callbacks.Callback):
@@ -98,16 +81,17 @@ class ProgressBarCallback(tf.keras.callbacks.Callback):
             description="Optimizing...", total=self.steps, iteration=0, loss=self.current_avg_loss
         )
 
-    def on_train_end(self, logs=None):
-        self.model._loss = self.current_loss(self.steps)
-        self.bar.remove_task(self.task)
+    # def on_train_end(self, logs=None):
+    #     self.model._loss = self.current_loss(self.steps)
+    #     self.bar.remove_task(self.task)
 
     def on_train_batch_begin(self, batch, logs=None):
         self.prev_avg_loss = self.current_avg_loss
 
     def on_train_batch_end(self, batch, logs=None):
         self.current_avg_loss = logs["loss"]
-        self.bar.update(self.task, advance=1, refresh=True, iteration=batch + 1, loss=self.current_loss(batch))
+        self.model._loss = self.current_loss(batch)
+        self.bar.update(self.task, advance=1, refresh=True, iteration=batch + 1, loss=self.model._loss)
 
     def current_loss(self, batch):
         return (batch + 1) * self.current_avg_loss - batch * self.prev_avg_loss
