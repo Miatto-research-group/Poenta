@@ -53,9 +53,9 @@ def C_mu_Sigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
     coshr = np.cosh(r)
     cgamma = np.conj(gamma)
 
-    C = np.exp(-0.5 * (np.abs(gamma) ** 2 - cgamma * (cgamma * exp2phidelta * tanhr))) / np.sqrt(coshr)
+    C = np.exp(-0.5 * np.abs(gamma) ** 2 - 0.5 * cgamma ** 2 * exp2phidelta * tanhr) / np.sqrt(coshr)
     mu = np.array([cgamma * exp2phidelta * tanhr + gamma, -cgamma * eiphi / coshr,])
-    Sigma = np.array([[exp2phidelta * tanhr, -eiphi / coshr], [-eiphi / coshr, -np.exp(-1j * delta) * tanhr]])
+    Sigma = np.array([[exp2phidelta * tanhr, -eiphi / coshr], [-eiphi / coshr, -np.exp(-1j * delta) * tanhr],])
 
     return C, mu, Sigma
 
@@ -92,9 +92,9 @@ def dC_dmu_dSigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
     # dC
     dC_dgamma = (-0.5 * cgamma) * C
     dC_dgammac = (-0.5 * gamma - cgamma * exp2phidelta * tanhr) * C
-    dC_dphi = (-1j * cgamma * cgamma * exp2phidelta * tanhr) * C
-    dC_dr = (-0.5 * cgamma * cgamma * exp2phidelta / (coshr * coshr)) * C - 0.5 * tanhr * C
-    dC_ddelta = (-0.5j * cgamma * cgamma * exp2phidelta * tanhr) * C
+    dC_dphi = (-1j * cgamma ** 2 * exp2phidelta * tanhr) * C
+    dC_dr = (-0.5 * cgamma ** 2 * exp2phidelta / coshr ** 2) * C - 0.5 * tanhr * C
+    dC_ddelta = (-0.5j * cgamma ** 2 * exp2phidelta * tanhr) * C
     if r > 0.01:
         dC_ddelta_over_r = dC_ddelta / r
     else:  # Taylor series for tanh(r)/r
@@ -232,68 +232,6 @@ def G_matrix(
             )
 
     return G
-
-
-@njit
-def grad_newstate(
-    gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, psi: np.array, G0: np.array, R: np.array
-) -> list:
-    """
-    Computes the gradient of the new state with respect to
-    gamma, gamma*, phi, z, z* but not with respect to the old state
-
-    Arguments:
-        gamma (complex): displacement parameter
-        phi (float): phase rotation parameter
-        z (complex): squeezing parameter
-        psi: (complex array): old state
-        G0 (complex array[D]): 1st row of the G matrix
-        R (complex array[D,D]): complete R matrix
-
-    Returns:
-        list[complex array[cutoff]]: gradient of the new state with respect to
-                                    gamma, gamma*, phi, z, z*
-    """
-
-    z = convert_scalar(z)
-    phi = convert_scalar(phi)
-    gamma = convert_scalar(gamma)
-    cutoff = convert_scalar(cutoff)
-    # print('state in grad_newstate: ', psi)
-    C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
-    dC, dmu, dSigma = dC_dmu_dSigma(gamma, phi, z)
-
-    dtype = psi.dtype
-    sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
-
-    dR = np.zeros((cutoff, cutoff, 5), dtype=dtype)
-    dG0 = np.zeros((cutoff, 5), dtype=dtype)
-
-    # grad of first row of Transformation matrix
-    dG0[0] = dC
-    for n in range(cutoff - 1):
-        dG0[n + 1] = (
-            dmu[1] * G0[n] + mu[1] * dG0[n] - dSigma[1, 1] * sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n] * dG0[n - 1]
-        ) / sqrt[n + 1]
-
-    # first row of dR matrix
-    for n in range(cutoff):
-        dR[0, n] = np.dot(np.transpose(dG0[: cutoff - n]), psi)
-        psi = psi[1:] * sqrt[1 : cutoff - n]
-
-    # rest of dR matrix
-    for m in range(cutoff - 1):
-        for k in range(cutoff - m - 1):
-            dR[m + 1, k] = (
-                dmu[0] * R[m, k]
-                + mu[0] * dR[m, k]
-                - dSigma[0, 0] * sqrt[m] * R[m - 1, k]
-                - Sigma[0, 0] * sqrt[m] * dR[m - 1, k]
-                - Sigma[0, 1] * dR[m, k + 1]
-                - dSigma[0, 1] * R[m, k + 1]
-            ) / sqrt[m + 1]
-
-    return list(np.transpose(dR[:, 0]))
 
 
 # Extras

@@ -1,4 +1,3 @@
-from .parameters import Parameters
-from .circuit import Circuit, OptimizationConfig
+from .circuit import Circuit
 
-__all__ = ["Parameters", "Circuit", "OptimizationConfig"]
+__all__ = ["Circuit"]

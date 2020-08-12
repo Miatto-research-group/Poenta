@@ -17,22 +17,10 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
 from typing import Callable, Union, Iterable
-from dataclasses import dataclass, field
 from collections import ChainMap
 from prettytable import PrettyTable
 
 from .keras import QuantumCircuit, ProgressBarCallback, LossHistoryCallback
-
-
-@dataclass
-class OptimizationConfig:
-    state_in: np.array
-    objective: np.array
-    loss_fn: Callable
-    optimizer: str = "Adam"
-    random_seed: int = 665
-    LR: float = 0.001
-    LR_schedule: dict = field(default_factory=dict)  # optional
 
 
 class Circuit:
@@ -78,7 +66,9 @@ class Circuit:
     ) -> LossHistoryCallback:
         if isinstance(optimizer, str):
             try:
-                opt = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[optimizer.capitalize()](learning_rate)
+                opt = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[optimizer.lower().capitalize()](
+                    learning_rate
+                )
             except KeyError:
                 raise ValueError("Optimizer {optimizer} not found.")
         elif isinstance(optimizer, tf.optimizers.Optimizer):
@@ -108,7 +98,7 @@ class Circuit:
             steps_per_epoch=steps,
             verbose=0,
             callbacks=[ProgressBarCallback(steps), history],
-            max_queue_size=10,
+            max_queue_size=20,
             workers=1,
             use_multiprocessing=False,
         )
@@ -121,7 +111,6 @@ class Circuit:
     #     table = PrettyTable()
     #     table.add_column("Layers", [self.num_layers])
     #     table.add_column("Cutoff", [self.cutoff])
-    #     table.add_column("Optimizer", [self.config.optimizer])
     #     trainable_pars = np.sum([p.shape for p in self.parameters.trainable])
     #     tot_pars = np.sum([p.shape for p in self.parameters.all])
     #     table.add_column("Params (trainable/tot)", [f"{trainable_pars}/{tot_pars}"])
