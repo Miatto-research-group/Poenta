@@ -41,7 +41,9 @@ class Circuit:
         self.dtype = dtype
         self._circuit = QuantumCircuit(num_modes=1, num_layers=num_layers, dtype=dtype)
         self._random_seed = 665
-        self._inout_pairs: list = []
+        self._inout_pairs: tuple
+        self.__should_compile = True
+        self.__schash = None
         
     @property
     def random_seed(self):
@@ -55,8 +57,15 @@ class Circuit:
 
     def set_input_output_pairs(self, *pairs:tuple):
         states_in, states_out = list(zip(*pairs))
-        self._inout_pairs = (tf.cast(tf.constant(states_in), dtype=self.dtype), tf.cast(tf.constant(states_out), dtype=self.dtype))
+        self._inout_pairs = (tf.convert_to_tensor(states_in, dtype=self.dtype), tf.convert_to_tensor(states_out, dtype=self.dtype))
         self._circuit._batch_size = len(pairs)
+
+    def should_compile(self, optimizer, learning_rate):
+        _hash = hash((hash(optimizer), hash(learning_rate)))
+        self.__should_compile = (self.__schash != _hash)
+        self.__schash = _hash
+        return self.__should_compile
+
 
     def optimize(self, loss_fn: Callable, steps: int, epochs: int = 1, optimizer: Union[str, tf.optimizers.Optimizer] = "Adam", learning_rate:float = 0.001) -> LossHistoryCallback:
         if isinstance(optimizer, str): 
@@ -69,7 +78,8 @@ class Circuit:
         else:
             raise ValueError("Optimizer can be a string (e.g. 'Adam') or an instance of an optimizer (e.g. `tf.optimizers.Adam(learning_rate=0.001)`).")
         
-        self._circuit.compile(optimizer=opt, loss=loss_fn, metrics=[])
+        if self.should_compile(optimizer, learning_rate):
+            self._circuit.compile(optimizer=opt, loss=loss_fn, metrics=[])
 
         def data():
             for i in range(steps):
@@ -82,7 +92,7 @@ class Circuit:
 
         history = LossHistoryCallback()
         self._circuit.fit(
-            x=ds.repeat(epochs), batch_size=len(self._inout_pairs), steps_per_epoch=steps, verbose = 0, callbacks=[ProgressBarCallback(steps, epochs), history], epochs=epochs, workers=1, use_multiprocessing=False
+            x=ds.repeat(epochs), batch_size=len(self._inout_pairs), steps_per_epoch=steps, verbose = 0, callbacks=[ProgressBarCallback(steps, epochs), history], epochs=epochs, max_queue_size=40, workers=1, use_multiprocessing=False
         )
         return history
 

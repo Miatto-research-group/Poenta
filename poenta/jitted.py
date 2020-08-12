@@ -53,9 +53,9 @@ def C_mu_Sigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
     coshr = np.cosh(r)
     cgamma = np.conj(gamma)
 
-    C = np.exp(-0.5 * np.abs(gamma) ** 2 - 0.5 * cgamma ** 2 * exp2phidelta * tanhr) / np.sqrt(coshr)
+    C = np.exp(-0.5 * (np.abs(gamma) ** 2 - cgamma * (cgamma * exp2phidelta * tanhr))) / np.sqrt(coshr)
     mu = np.array([cgamma * exp2phidelta * tanhr + gamma, -cgamma * eiphi / coshr,])
-    Sigma = np.array([[exp2phidelta * tanhr, -eiphi / coshr], [-eiphi / coshr, -np.exp(-1j * delta) * tanhr],])
+    Sigma = np.array([[exp2phidelta * tanhr, -eiphi / coshr], [-eiphi / coshr, -np.exp(-1j * delta) * tanhr]])
 
     return C, mu, Sigma
 
@@ -92,9 +92,9 @@ def dC_dmu_dSigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
     # dC
     dC_dgamma = (-0.5 * cgamma) * C
     dC_dgammac = (-0.5 * gamma - cgamma * exp2phidelta * tanhr) * C
-    dC_dphi = (-1j * cgamma ** 2 * exp2phidelta * tanhr) * C
-    dC_dr = (-0.5 * cgamma ** 2 * exp2phidelta / coshr ** 2) * C - 0.5 * tanhr * C
-    dC_ddelta = (-0.5j * cgamma ** 2 * exp2phidelta * tanhr) * C
+    dC_dphi = (-1j * cgamma * cgamma * exp2phidelta * tanhr) * C
+    dC_dr = (-0.5 * cgamma * cgamma * exp2phidelta / (coshr * coshr)) * C - 0.5 * tanhr * C
+    dC_ddelta = (-0.5j * cgamma * cgamma * exp2phidelta * tanhr) * C
     if r > 0.01:
         dC_ddelta_over_r = dC_ddelta / r
     else:  # Taylor series for tanh(r)/r

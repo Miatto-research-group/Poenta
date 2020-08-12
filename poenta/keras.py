@@ -35,7 +35,7 @@ class QuantumLayer(tf.keras.layers.Layer):
 
     def call(self, input):
         gaussian_output = GaussianTransformation(self.gamma, self.phi, self.zeta, input)
-        output = KerrDiagonal(self.kappa, input.shape[1], dtype=self.complextype) * gaussian_output
+        output = KerrDiagonal(self.kappa, input.shape[1], dtype=self.complextype)[None,:] * gaussian_output
         output.set_shape(input.get_shape())
         return output
 
