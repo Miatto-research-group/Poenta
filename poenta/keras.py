@@ -60,6 +60,31 @@ class QuantumCircuit(tf.keras.Sequential):
         )
 
 
+class LossCallback(tf.keras.callbacks.Callback):
+    """
+    Callback that embeds the loss value as a model attribute 
+    at the end of each training batch.
+    """
+    def __init__(self):
+        super().__init__()
+        self.prev_avg_loss = None
+        self.current_avg_loss = None
+
+    def on_train_begin(self, logs=None):
+        self.current_avg_loss = self.model._loss
+
+    def on_train_batch_begin(self, batch, logs=None):
+        self.prev_avg_loss = self.current_avg_loss
+
+    def on_train_batch_end(self, batch, logs=None):
+        self.current_avg_loss = logs["loss"]
+        self.model._loss = self.current_loss(batch)
+
+    def current_loss(self, batch):
+        return (batch + 1) * self.current_avg_loss - batch * self.prev_avg_loss
+
+
+
 class ProgressBarCallback(tf.keras.callbacks.Callback):
     def __init__(self, steps: int, init_step: int):
         super().__init__()
@@ -70,47 +95,37 @@ class ProgressBarCallback(tf.keras.callbacks.Callback):
             TextColumn("Iteration {task.fields[iteration]}/{task.fields[cumul]}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("Loss = {task.fields[loss]:.5f} | Time remaining: "),
+            TextColumn("Loss = {task.fields[loss]:.5f} | ⏳ "),
             TimeRemainingColumn(),
+            TextColumn("lr = {task.fields[lr]:.6f}"),
         )
-        self.prev_avg_loss = None
-        self.current_avg_loss = None
 
     def on_train_begin(self, logs=None):
-        self.current_avg_loss = self.model._loss
         self.task = self.task = self.bar.add_task(
-            description="Optimizing...", total=self.steps, iteration=self.init_step, loss=self.current_avg_loss, cumul=self.steps+self.init_step
+            description="Optimizing...", total=self.steps, iteration=self.init_step, loss=self.model._loss, cumul=self.steps+self.init_step, lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
         )
 
-    def on_train_batch_begin(self, batch, logs=None):
-        self.prev_avg_loss = self.current_avg_loss
-
     def on_train_batch_end(self, batch, logs=None):
-        self.current_avg_loss = logs["loss"]
-        self.model._loss = self.current_loss(batch)
-        self.bar.update(self.task, advance=1, refresh=True, iteration=batch + 1 + self.init_step, loss=self.model._loss)
+        self.bar.update(self.task, advance=1, refresh=True, iteration=batch + 1 + self.init_step, loss=self.model._loss, lr=float(tf.keras.backend.get_value(self.model.optimizer.lr)))
 
-    def current_loss(self, batch):
-        return (batch + 1) * self.current_avg_loss - batch * self.prev_avg_loss
+
+
+
+class LearningRateScheduler(tf.keras.callbacks.Callback):
+    def __init__(self, initial_lr: float):
+        super().__init__()
+        self.initial_lr = initial_lr
+        
+    def on_train_batch_end(self, batch, logs=None):
+        tf.keras.backend.set_value(self.model.optimizer.lr, self.model._loss*self.initial_lr)
 
 
 class LossHistoryCallback(tf.keras.callbacks.Callback):
     def __init__(self):
         super().__init__()
-        self.prev_avg_loss = None
-        self.current_avg_loss = None
-
-    def on_train_begin(self, logs=None):
-        self.current_avg_loss = self.model._loss
-        self.losses = []
-        self.val_losses = []
-
-    def on_train_batch_begin(self, batch, logs=None):
-        self.prev_avg_loss = self.current_avg_loss
+        self.losses= []
 
     def on_train_batch_end(self, batch, logs=None):
-        self.current_avg_loss = logs["loss"]
-        self.losses.append(self.current_loss(batch))
+        self.losses.append(self.model._loss)
 
-    def current_loss(self, batch):
-        return (batch + 1) * self.current_avg_loss - batch * self.prev_avg_loss
+
