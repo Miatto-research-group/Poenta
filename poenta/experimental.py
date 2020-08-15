@@ -56,11 +56,8 @@ def R_matrix(gamma, phi, z, old_state):
         R[:, 0, n] = np.sum(old_state * G0[: cutoff - n], axis=-1)
         old_state = old_state[:, 1:] * sqrt[1 : cutoff - n]
 
-    # second row of R matrix
-    R[:, 1, :-1] = mu[0] * R[:, 0, :-1] - Sigma[0, 1] * R[:, 0, 1:]
-
     # rest of R matrix
-    for m in range(2, cutoff):
+    for m in range(1, cutoff):
         R[:, m, :-m] = (
             mu[0] * R[:, m - 1, :-m]
             - Sigma[0, 0] * sqrt[m - 1] * R[:, m - 2, :-m]
@@ -128,11 +125,11 @@ def R_matrix(gamma, phi, z, old_state):
 #     return list(np.transpose(dR[:,:, 0], (2, 0, 1)))
 
 
-@njit(fastmath=True)
-def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, psi: np.array, G0: np.array, R: np.array) -> list:
+@njit()
+def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0: np.array, R: np.array) -> list:
 
-    batch, cutoff = psi.shape
-    dtype = psi.dtype
+    batch, cutoff = state_in.shape
+    dtype = state_in.dtype
 
     z = convert_scalar(z)
     phi = convert_scalar(phi)
@@ -157,22 +154,14 @@ def grad_newstate(gamma: np.complex, phi: np.float, z: np.complex, psi: np.array
 
     # first row of dR matrix
     for n in range(cutoff):
-        dR[:, 0, n] = np.dot(psi, dG0[: cutoff - n])
-        psi = psi[:, 1:] * sqrt[1 : cutoff - n]
+        dR[:, 0, n] = np.dot(state_in, dG0[: cutoff - n])
+        state_in = state_in[:, 1:] * sqrt[1 : cutoff - n]
 
-    # second row of dR matrix
-    dR[:, 1, :-1] = (
-        ed(R[:, 0, :-1], 2) * ed(ed(dmu[0], 0), 0)
-        - ed(R[:, 0, 1:], 2) * ed(ed(dSigma[0, 1], 0), 0)
-        + mu[0] * dR[:, 0, :-1]
-        - Sigma[0, 1] * dR[:, 0, 1:]
-    )
-
-    # rest of R matrix
-    for m in range(2, cutoff):
+    # rest of dR matrix
+    for m in range(1, cutoff):
         dR[:, m, :-m] = (
             ed(R[:, m - 1, :-m], 2) * ed(ed(dmu[0], 0), 1)
-            - sqrt[m - 1] * ed(R[:, m - 2, :-m], 2) * ed(ed(dSigma[0, 0], 0), 1)
+            - sqrt[m - 1] * ed(R[:, m - 2, :-m], 2) * ed(ed(dSigma[0, 0], 0), 0)
             - ed(R[:, m - 1, 1 : -m + 1], 2) * ed(ed(dSigma[0, 1], 0), 0)
             + mu[0] * dR[:, m - 1, :-m]
             - Sigma[0, 0] * sqrt[m - 1] * dR[:, m - 2, :-m]

@@ -17,7 +17,7 @@ import tensorflow as tf
 import numpy as np
 
 from .jitted import G_matrix
-from .experimental import grad_newstate, R_matrix
+from .experimental import dPsi, R_matrix
 
 
 def complex_initializer(dtype):
@@ -81,21 +81,17 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
 
     R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
     state_out = R[..., 0]
-    # print('called R')
-    # print(f"post: {gamma}\n {phi}\n {z}\n {state_in}\n {state_out}")
 
     def grad(dy):
         "Vector-Jacobian products for all the arguments (gamma, phi, z, Psi)"
         G = tf.numpy_function(G_matrix, [gamma, phi, z, cutoff], dtype_c)
         dPsi_dgamma, dPsi_dgammac, dPsi_dphi, dPsi_dz, dPsi_dzc = tf.numpy_function(
-            grad_newstate, [gamma, phi, z, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c)
+            dPsi, [gamma, phi, z, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c)
         )
         grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
-        grad_Psic = tf.linalg.matvec(
-            G, dy, adjoint_a=True
-        )  # NOTE: can we compute directly the product between G and dy?
+        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)
         return grad_gammac, grad_phi, grad_zc, grad_Psic
 
     return state_out, grad
