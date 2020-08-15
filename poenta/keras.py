@@ -17,6 +17,7 @@ import tensorflow as tf
 from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal
 from .parameters import Parameters
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
+from numpy import pi, cos
 
 
 class QuantumLayer(tf.keras.layers.Layer):
@@ -54,6 +55,7 @@ class QuantumCircuit(tf.keras.Sequential):
         self.realtype, self.complextype = real_complex_types(dtype)
         self._loss = 1.0
         self._batch_size = None
+        self.cutoff = cutoff
         super().__init__(
             [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
             + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
@@ -116,7 +118,8 @@ class LearningRateScheduler(tf.keras.callbacks.Callback):
         self.initial_lr = initial_lr
         
     def on_train_batch_begin(self, batch, logs=None):
-        tf.keras.backend.set_value(self.model.optimizer.lr, self.model._loss*self.initial_lr)
+        new_lr = max(self.model._loss * self.initial_lr, 0.00001)
+        tf.keras.backend.set_value(self.model.optimizer.lr, new_lr)
 
 
 class LossHistoryCallback(tf.keras.callbacks.Callback):

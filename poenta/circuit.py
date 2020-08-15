@@ -18,7 +18,7 @@ import tensorflow_addons as tfa
 import numpy as np
 from typing import Callable, Union, Iterable
 from collections import ChainMap
-from prettytable import PrettyTable
+import rich
 
 from .keras import QuantumCircuit, LossCallback, LearningRateScheduler, ProgressBarCallback, LossHistoryCallback
 
@@ -27,7 +27,7 @@ class Circuit:
     def __init__(self, num_layers: int, dtype: tf.dtypes.DType):
         self.num_layers = num_layers
         self.dtype = dtype
-        self._circuit: QuantumCircuit
+        self._model: QuantumCircuit
 
         self.set_random_seed(665)
         self._inout_pairs: tuple
@@ -44,7 +44,7 @@ class Circuit:
         states_in = tf.convert_to_tensor(states_in, dtype=self.dtype)
         states_out = tf.convert_to_tensor(states_out, dtype=self.dtype)
         self._inout_pairs = (states_in, states_out)
-        self._circuit = QuantumCircuit(
+        self._model = QuantumCircuit(
             num_modes=1,
             num_layers=self.num_layers,
             batch_size=states_in.shape[0],
@@ -84,7 +84,7 @@ class Circuit:
             )
 
         if self.should_compile(optimizer, learning_rate):
-            self._circuit.compile(optimizer=opt, loss=loss_fn, metrics=[])
+            self._model.compile(optimizer=opt, loss=loss_fn, metrics=[])
 
         def data():
             for i in range(steps):
@@ -92,12 +92,12 @@ class Circuit:
 
         ds = tf.data.Dataset.from_generator(
             data,
-            output_types=(self._circuit.complextype, self._circuit.complextype),
+            output_types=(self._model.complextype, self._model.complextype),
             output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape),
         )
 
         history = LossHistoryCallback()
-        self._circuit.fit(
+        self._model.fit(
             x=ds,
             batch_size=len(self._inout_pairs),
             steps_per_epoch=steps,
@@ -112,14 +112,23 @@ class Circuit:
         
         return history
 
-    def export_weights(self, filename: str):
-        pass
+    def show_evolution(self, state_in:tf.Tensor, figsize:tuple = (16,6), cutoff:int = 30, logy:bool = False):
+        functor = tf.keras.backend.function([self._model.input], [layer.output for layer in self._model.layers])   # evaluation function
+        layer_outs = functor(state_in)
 
-    # def __repr__(self):
-    #     table = PrettyTable()
-    #     table.add_column("Layers", [self.num_layers])
-    #     table.add_column("Cutoff", [self.cutoff])
-    #     trainable_pars = np.sum([p.shape for p in self.parameters.trainable])
-    #     tot_pars = np.sum([p.shape for p in self.parameters.all])
-    #     table.add_column("Params (trainable/tot)", [f"{trainable_pars}/{tot_pars}"])
-    #     return str(table)
+        import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.rcParams['figure.figsize'] = figsize
+
+    
+        fig, ax = plt.subplots(int(np.ceil(self.num_layers / 5)), 5)
+
+        for k,o in enumerate(layer_outs):
+            if logy:
+                ax[k//5,k%5].set_yscale('log')
+            ax[k//5,k%5].set_ylim([1e-6, 1.1])
+            ax[k//5,k%5].bar(range(min(cutoff,self._model.cutoff)),(abs(o[0])**2)[:min(cutoff, self._model.cutoff)])
+
+    def __repr__(self):
+        circuit._model.summary(line_length=80, print_fn = rich.print)
+        return ''
