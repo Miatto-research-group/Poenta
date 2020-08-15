@@ -15,6 +15,7 @@
 
 import tensorflow as tf
 import tensorflow_addons as tfa
+import matplotlib.pyplot as plt
 import numpy as np
 from typing import Callable, Union, Iterable
 from collections import ChainMap
@@ -27,13 +28,16 @@ class Circuit:
     def __init__(self, num_layers: int, dtype: tf.dtypes.DType):
         self.num_layers = num_layers
         self.dtype = dtype
-        self._model: QuantumCircuit
 
-        self.set_random_seed(665)
+        self._model: QuantumCircuit
+        self._historycallback: LossHistoryCallback
         self._inout_pairs: tuple
         self._cumul_steps: int = 0
+
         self.__should_compile = True
         self.__schash = None
+        
+        self.set_random_seed(665)
 
     def set_random_seed(self, n: int):
         tf.random.set_seed(n)
@@ -52,19 +56,13 @@ class Circuit:
             dtype=self.dtype,
         )
 
-    def should_compile(self, optimizer, learning_rate):
+    def _should_compile(self, optimizer, learning_rate):
         _hash = hash((hash(optimizer), hash(learning_rate)))
         self.__should_compile = self.__schash != _hash
         self.__schash = _hash
         return self.__should_compile
 
-    def optimize(
-        self,
-        loss_fn: Callable,
-        steps: int,
-        optimizer: Union[str, tf.optimizers.Optimizer] = "Adam",
-        learning_rate: float = 0.001,
-    ) -> LossHistoryCallback:
+    def _validate_optimizer(self, optimizer, learning_rate):
         if isinstance(optimizer, str):
             try:
                 opt = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[optimizer](learning_rate)
@@ -82,52 +80,82 @@ class Circuit:
             raise ValueError(
                 "Optimizer can be a string (e.g. 'Adam') or an instance of an optimizer (e.g. `tf.optimizers.Adam(learning_rate=0.001)`)."
             )
+        return opt
 
-        if self.should_compile(optimizer, learning_rate):
-            self._model.compile(optimizer=opt, loss=loss_fn, metrics=[])
 
+    def optimize(
+        self,
+        loss_fn: Callable,
+        steps: int,
+        optimizer: Union[str, tf.optimizers.Optimizer] = "Adam",
+        learning_rate: float = 0.001,
+    ) -> LossHistoryCallback:
+
+        if self._should_compile(optimizer, learning_rate):
+            self._model.compile(optimizer=self._validate_optimizer(optimizer, learning_rate), loss=loss_fn, metrics=[])
+            self._historycallback = LossHistoryCallback()
+
+        # Prepare input dataset
         def data():
             for i in range(steps):
                 yield self._inout_pairs
-
         ds = tf.data.Dataset.from_generator(
             data,
             output_types=(self._model.complextype, self._model.complextype),
-            output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape),
-        )
+            output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape))
 
-        history = LossHistoryCallback()
-        self._model.fit(
-            x=ds,
-            batch_size=len(self._inout_pairs),
-            steps_per_epoch=steps,
-            verbose=0,
-            callbacks=[LossCallback(), ProgressBarCallback(steps, self._cumul_steps), history, LearningRateScheduler(learning_rate)],
-            max_queue_size=40,
-            workers=1,
-            use_multiprocessing=False,
-        )
-
-        self._cumul_steps += steps
+        try:
+            self._model.fit(
+                x=ds,
+                batch_size=len(self._inout_pairs),
+                steps_per_epoch=steps,
+                verbose=0,
+                callbacks=[LossCallback(), ProgressBarCallback(steps), self._historycallback, LearningRateScheduler(learning_rate)],
+                max_queue_size=20,
+                workers=1,
+                use_multiprocessing=False,
+            )
+        except KeyboardInterrupt:
+            print("Graciously interrupting the training...")
+        finally:
+            plt.plot(self._historycallback.losses)
         
-        return history
+        return self._historycallback
 
-    def show_evolution(self, state_in:tf.Tensor, figsize:tuple = (16,6), cutoff:int = 30, logy:bool = False):
+    def show_evolution(self, state_in:Union[tf.Tensor, np.array], figsize:tuple = (18,6), cutoff:int = 20, logy:bool = False):
+        state_in = tf.convert_to_tensor(state_in)
+
         functor = tf.keras.backend.function([self._model.input], [layer.output for layer in self._model.layers])   # evaluation function
+        if len(state_in.shape) == 1 and state_in.shape == self._inout_pairs[0].shape[1]:
+            state_in = state_in[None, :]
+
         layer_outs = functor(state_in)
 
         import matplotlib.pyplot as plt
-        import matplotlib
-        matplotlib.rcParams['figure.figsize'] = figsize
-
+        from matplotlib.ticker import MaxNLocator
+        import matplotlib.cm as cm
+        hue = cm.get_cmap('hsv')
+        
     
-        fig, ax = plt.subplots(int(np.ceil(self.num_layers / 5)), 5)
+        fig, axes = plt.subplots(int(np.ceil(self.num_layers / 5)), 5,figsize=figsize)
+        fig.suptitle("Photon N probability distribution at the output of each layer", fontsize=16)
+        for k,amplitudes in enumerate(layer_outs):
+            if self.num_layers > 5:
+                ax = axes[k//5,k%5]
+            else:
+                ax = axes[k%5]
 
-        for k,o in enumerate(layer_outs):
-            if logy:
-                ax[k//5,k%5].set_yscale('log')
-            ax[k//5,k%5].set_ylim([1e-6, 1.1])
-            ax[k//5,k%5].bar(range(min(cutoff,self._model.cutoff)),(abs(o[0])**2)[:min(cutoff, self._model.cutoff)])
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            ax.set_yscale('log' if logy else 'linear')
+            ax.set_xlabel("Photon N")
+            ax.title.set_text(f'Layer {k+1}')
+            ax.set_ylim([1e-6, 1.1])
+
+            amplitudes = amplitudes[:min(cutoff, self._model.cutoff)]
+            probs = np.abs(amplitudes[0])**2
+            phases = np.angle(amplitudes[0])
+            ax.bar(range(len(probs)), probs, color=hue(phases/np.pi + 1.0))
+
 
     def __repr__(self):
         circuit._model.summary(line_length=80, print_fn = rich.print)
