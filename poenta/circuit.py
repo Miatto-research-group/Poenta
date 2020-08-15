@@ -122,7 +122,7 @@ class Circuit:
         
         return self._historycallback
 
-    def show_evolution(self, state_in:Union[tf.Tensor, np.array], figsize:tuple = (18,6), cutoff:int = 20, logy:bool = False):
+    def show_evolution(self, state_in:Union[tf.Tensor, np.array], figsize:tuple = (17,6), cutoff:int = 20, logy:bool = False):
         state_in = tf.convert_to_tensor(state_in)
 
         functor = tf.keras.backend.function([self._model.input], [layer.output for layer in self._model.layers])   # evaluation function
@@ -139,6 +139,7 @@ class Circuit:
     
         fig, axes = plt.subplots(int(np.ceil(self.num_layers / 5)), 5,figsize=figsize)
         fig.suptitle("Photon N probability distribution at the output of each layer", fontsize=16)
+
         for k,amplitudes in enumerate(layer_outs):
             if self.num_layers > 5:
                 ax = axes[k//5,k%5]
@@ -155,7 +156,8 @@ class Circuit:
             probs = np.abs(amplitudes[0])**2
             phases = np.angle(amplitudes[0])
             ax.bar(range(len(probs)), probs, color=hue(phases/np.pi + 1.0))
-
+        
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     def __repr__(self):
         circuit._model.summary(line_length=80, print_fn = rich.print)
