@@ -16,10 +16,8 @@
 import tensorflow as tf
 import numpy as np
 
-from .jitted import G_matrix, grad_newstate
-
-from .jitted import G_matrix, grad_newstate
-from .experimental import R_matrix
+from .jitted import G_matrix
+from .experimental import dPsi, R_matrix
 
 
 def complex_initializer(dtype):
@@ -29,6 +27,7 @@ def complex_initializer(dtype):
         real = f(*args, **kwargs)
         imag = f(*args, **kwargs)
         return tf.cast(tf.complex(real, imag), dtype)
+
     return initializer
 
 
@@ -38,11 +37,24 @@ def real_initializer(dtype):
     def initializer(*args, dtype, **kwargs):
         real = f(*args, **kwargs)
         return tf.cast(real, dtype)
+
     return initializer
 
 
+def real_complex_types(dtype: tf.dtypes.DType):
+    if dtype == tf.complex128:
+        realtype = tf.float64
+        complextype = tf.complex128
+    elif dtype == tf.complex64:
+        realtype = tf.float32
+        complextype = tf.complex64
+    else:
+        raise ValueError(f"dtype can be only tf.complex128 or tf.complex64, not {dtype}")
+    return realtype, complextype
+
+
 @tf.custom_gradient
-def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, state_in: tf.Tensor, cutoff: int) -> tf.Tensor:
+def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, state_in: tf.Tensor) -> tf.Tensor:
     """
     Evolution of a single-mode quantum state through a Gaussian transformation parametrized
     by the three parameters gamma, phi and z.
@@ -61,26 +73,27 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
     gamma = tf.convert_to_tensor(gamma)
     phi = tf.convert_to_tensor(phi)
     z = tf.convert_to_tensor(z)
-    state_in = tf.convert_to_tensor(tf.squeeze(state_in))
+    state_in = tf.convert_to_tensor(state_in)
+    cutoff = state_in.shape[1]
 
     dtype_c = state_in.dtype
     dtype_r = phi.dtype
-    # print('about to call R')
-    R = tf.numpy_function(R_matrix, [gamma, phi, z, cutoff, state_in], dtype_c)
-    state_out = R[:, 0]
-    # print('called R')
-    # print(f"post: {gamma}\n {phi}\n {z}\n {state_in}\n {state_out}")
+
+    R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
+    state_out = R[..., 0]
 
     def grad(dy):
         "Vector-Jacobian products for all the arguments (gamma, phi, z, Psi)"
         G = tf.numpy_function(G_matrix, [gamma, phi, z, cutoff], dtype_c)
         dPsi_dgamma, dPsi_dgammac, dPsi_dphi, dPsi_dz, dPsi_dzc = tf.numpy_function(
-            grad_newstate, [gamma, phi, z, cutoff, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c))
+            dPsi, [gamma, phi, z, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c)
+        )
         grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
-        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)  # NOTE: can we compute directly the product between G and dy?
-        return grad_gammac, grad_phi, grad_zc, grad_Psic, None
+        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)
+        return grad_gammac, grad_phi, grad_zc, grad_Psic
+
     return state_out, grad
 
 

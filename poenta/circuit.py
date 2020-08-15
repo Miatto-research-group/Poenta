@@ -16,114 +16,119 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
-from rich.progress import Progress, BarColumn, TimeRemainingColumn, TextColumn
-from dataclasses import dataclass, field
+from typing import Callable, Union, Iterable
 from collections import ChainMap
-from prettytable import PrettyTable
+import rich
 
-from .nputils import init_complex, init_real
-from .tfutils import GaussianTransformation, KerrDiagonal
-from .parameters import Parameters
-
-
-@dataclass
-class OptimizationConfig:
-    state_in: np.array
-    objective: np.array
-    optimizer: str = "Adam"
-    random_seed: int = 666
-    LR: float = 0.001
-    LR_schedule: dict = field(default_factory=dict)  # optional
+from .keras import QuantumCircuit, LossCallback, LearningRateScheduler, ProgressBarCallback, LossHistoryCallback
 
 
 class Circuit:
-    def __init__(self, num_layers: int, dtype: tf.dtypes.DType, config: OptimizationConfig):
-        self.dtype = dtype
-        self.set_optimization_config(config)
-
+    def __init__(self, num_layers: int, dtype: tf.dtypes.DType):
         self.num_layers = num_layers
-        self._state_out = None
-        self._fidelity = None
-        self.cutoff = self.state_in.shape[0]
-        self.parameters = Parameters(num_layers=num_layers, dtype=dtype)
+        self.dtype = dtype
+        self._model: QuantumCircuit
 
-    def set_optimization_config(self, config: OptimizationConfig):
-        tf.random.set_seed(config.random_seed)
-        np.random.seed(config.random_seed)
-        self.config = config
-        self.state_in = tf.cast(tf.constant(config.state_in), dtype=self.dtype)
-        self.objective = tf.cast(tf.constant(config.objective), dtype=self.dtype)
-        self.optimizer = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[config.optimizer](config.LR)
+        self.set_random_seed(665)
+        self._inout_pairs: tuple
+        self._cumul_steps: int = 0
+        self.__should_compile = True
+        self.__schash = None
 
-    def _layer_out(self, gamma: tf.Tensor, phi: tf.Tensor, zeta: tf.Tensor, k: tf.Tensor, layer_in: tf.Tensor) -> tf.Tensor:
-        layer_out = GaussianTransformation(gamma, phi, zeta, layer_in, self.cutoff)
-        return KerrDiagonal(k, self.cutoff, self.dtype) * layer_out
+    def set_random_seed(self, n: int):
+        tf.random.set_seed(n)
+        np.random.seed(n)
 
+    def set_input_output_pairs(self, *pairs: tuple):
+        states_in, states_out = list(zip(*pairs))
+        states_in = tf.convert_to_tensor(states_in, dtype=self.dtype)
+        states_out = tf.convert_to_tensor(states_out, dtype=self.dtype)
+        self._inout_pairs = (states_in, states_out)
+        self._model = QuantumCircuit(
+            num_modes=1,
+            num_layers=self.num_layers,
+            batch_size=states_in.shape[0],
+            cutoff=states_in.shape[1],
+            dtype=self.dtype,
+        )
 
-    @property  # lazy property
-    def state_out(self) -> tf.Tensor:
-        if self._state_out is None:
-            state = self.state_in
-            for i in range(self.num_layers):
-                state = self._layer_out(
-                    self.parameters.gamma[i],
-                    self.parameters.phi[i],
-                    self.parameters.zeta[i],
-                    self.parameters.kappa[i],
-                    state,
-                )
-            self._state_out = state
-        return self._state_out
+    def should_compile(self, optimizer, learning_rate):
+        _hash = hash((hash(optimizer), hash(learning_rate)))
+        self.__should_compile = self.__schash != _hash
+        self.__schash = _hash
+        return self.__should_compile
 
-    @property  # lazy property
-    def fidelity(self):
-        if self._fidelity is None:
-            self._fidelity = tf.abs(tf.reduce_sum(self.state_out * tf.math.conj(self.objective))) ** 2
-        return self._fidelity
+    def optimize(
+        self,
+        loss_fn: Callable,
+        steps: int,
+        optimizer: Union[str, tf.optimizers.Optimizer] = "Adam",
+        learning_rate: float = 0.001,
+    ) -> LossHistoryCallback:
+        if isinstance(optimizer, str):
+            try:
+                opt = ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)[optimizer](learning_rate)
+            except KeyError as e:
+                guess = [
+                    opt
+                    for opt in ChainMap(tf.optimizers.__dict__, tfa.optimizers.__dict__)
+                    if optimizer.lower() in opt.lower() or opt.lower() in optimizer.lower()
+                ]
+                e.args = (f"Optimizer {optimizer} not found. Did you mean one of the following: {guess}?",)
+                raise e
+        elif isinstance(optimizer, tf.optimizers.Optimizer):
+            opt = optimizer
+        else:
+            raise ValueError(
+                "Optimizer can be a string (e.g. 'Adam') or an instance of an optimizer (e.g. `tf.optimizers.Adam(learning_rate=0.001)`)."
+            )
 
-    def loss(self):
-        return 1.0 - self.fidelity
+        if self.should_compile(optimizer, learning_rate):
+            self._model.compile(optimizer=opt, loss=loss_fn, metrics=[])
 
-    def minimize_step(self) -> float:
-        self._state_out = None  # reset lazy output state
-        self._fidelity = None # reset lazy fidelity
-        self.parameters.save()  # save current values before updating
-        self.optimizer.minimize(self.loss, self.parameters.trainable)
-        return self.loss()
-
-    def minimize(self, steps) -> list:
-        loss_list = [] 
-
-        with Progress(
-            TextColumn("[progress.description] Iteration {task.fields[iteration]}/{task.total}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("Loss = {task.fields[loss]:.5f} | Time remaining: "),
-            TimeRemainingColumn()) as bar:
-            task = bar.add_task(description="Optimizing...", total=steps, iteration=0, loss = self.loss())
+        def data():
             for i in range(steps):
-                try:
-                    loss_list.append(self.minimize_step())
+                yield self._inout_pairs
 
-                    # LR scheduling
-                    for threshold, new_LR in self.config.LR_schedule.items():
-                        if loss_list[-1] < threshold:
-                            self.optimizer.lr = new_LR
+        ds = tf.data.Dataset.from_generator(
+            data,
+            output_types=(self._model.complextype, self._model.complextype),
+            output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape),
+        )
 
-                except KeyboardInterrupt:
-                    break
-                except Exception as e:
-                    print(f"other exception: {e}")
-                    raise e
-                bar.update(task, advance=1, refresh=True, iteration = i+1, loss = self.loss())
-        return loss_list
+        history = LossHistoryCallback()
+        self._model.fit(
+            x=ds,
+            batch_size=len(self._inout_pairs),
+            steps_per_epoch=steps,
+            verbose=0,
+            callbacks=[LossCallback(), ProgressBarCallback(steps, self._cumul_steps), history, LearningRateScheduler(learning_rate)],
+            max_queue_size=40,
+            workers=1,
+            use_multiprocessing=False,
+        )
+
+        self._cumul_steps += steps
+        
+        return history
+
+    def show_evolution(self, state_in:tf.Tensor, figsize:tuple = (16,6), cutoff:int = 30, logy:bool = False):
+        functor = tf.keras.backend.function([self._model.input], [layer.output for layer in self._model.layers])   # evaluation function
+        layer_outs = functor(state_in)
+
+        import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.rcParams['figure.figsize'] = figsize
+
+    
+        fig, ax = plt.subplots(int(np.ceil(self.num_layers / 5)), 5)
+
+        for k,o in enumerate(layer_outs):
+            if logy:
+                ax[k//5,k%5].set_yscale('log')
+            ax[k//5,k%5].set_ylim([1e-6, 1.1])
+            ax[k//5,k%5].bar(range(min(cutoff,self._model.cutoff)),(abs(o[0])**2)[:min(cutoff, self._model.cutoff)])
 
     def __repr__(self):
-        table = PrettyTable()
-        table.add_column("Layers", [self.num_layers])
-        table.add_column("Cutoff", [self.cutoff])
-        table.add_column("Optimizer", [self.config.optimizer])
-        trainable_pars = np.sum([p.shape for p in self.parameters.all])
-        tot_pars = np.sum([p.shape for p in self.parameters.trainable])
-        table.add_column("Params (trainable/tot)", [f"{trainable_pars}/{tot_pars}"])
-        return str(table)
+        circuit._model.summary(line_length=80, print_fn = rich.print)
+        return ''

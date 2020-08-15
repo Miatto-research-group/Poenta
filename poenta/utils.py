@@ -1,5 +1,6 @@
 from rich.progress import ProgressColumn
 
+
 class OptimizeColumn(ProgressColumn):
     """Renders optimization progress data"""
 

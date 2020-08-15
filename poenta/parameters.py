@@ -15,12 +15,11 @@
 
 import tensorflow as tf
 import numpy as np
-import matplotlib
-matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 
 from .nputils import init_complex, init_real
+from .tfutils import real_complex_types
 
 
 class Parameters:
@@ -30,32 +29,28 @@ class Parameters:
     As an example, the `Circuit` class contains an instance of `Parameters`.
     """
 
-    def __init__(self, num_layers: int, dtype: tf.dtypes.DType = tf.complex64):
+    def __init__(self, num_modes: int = 1, num_layers: int = 0, dtype: tf.dtypes.DType = tf.complex64):
         """
         Arguments:
             num_layers (int): number of layers in the circuit
             dtype (tensorflow Dtype): type of the complex parameters of the circuit. The real parameters are automatically set accordingly.
         """
-        if dtype == tf.complex128:
-            self.complextype = tf.complex128
-            self.realtype = tf.float64
-        elif dtype == tf.complex64:
-            self.complextype = tf.complex64
-            self.realtype = tf.float32
-        else:
-            raise ValueError(f"dtype can be only tf.complex128 or tf.complex64, not {dtype}")
+        self.realtype, self.complextype = real_complex_types(dtype)
+        self._history: dict = {"gamma": [], "phi": [], "zeta": [], "kappa": []}
 
-        self.gamma = tf.Variable(init_complex(num_layers, 0.01), dtype=self.complextype, name=f"gamma")
-        self.phi = tf.Variable(init_real(num_layers, 0.01), dtype=self.realtype, name=f"phi")
-        self.zeta = tf.Variable(init_complex(num_layers, 0.01), dtype=self.complextype, name=f"zeta")
-        self.kappa = tf.Variable(init_real(num_layers, 0.01), dtype=self.realtype, name=f"kappa")
+        if num_layers > 0:
+            self.gamma = tf.Variable(init_complex(num_layers, 0.01), dtype=self.complextype, name=f"gamma")
+            self.phi = tf.Variable(init_real(num_layers, 0.01), dtype=self.realtype, name=f"phi")
+            self.zeta = tf.Variable(init_complex(num_layers, 0.01), dtype=self.complextype, name=f"zeta")
+            self.kappa = tf.Variable(init_real(num_layers, 0.01), dtype=self.realtype, name=f"kappa")
+            self.save()
 
-        self._history: dict = {
-            "gamma": [self.gamma.numpy()],
-            "phi": [self.phi.numpy()],
-            "zeta": [self.zeta.numpy()],
-            "kappa": [self.kappa.numpy()],
-        }
+    def add_from_list(self, lst: list):
+        "Assumes params in lst are in order: gamma, phi, zeta, kappa"
+        self.gamma = tf.vstack([self.gamma, lst[0]])
+        self.phi = tf.vstack([self.phi, lst[1]])
+        self.zeta = tf.vstack([self.zeta, lst[2]])
+        self.kappa = tf.vstack([self.kappa, lst[3]])
 
     @property
     def trainable(self):
