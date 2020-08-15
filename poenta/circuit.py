@@ -89,6 +89,7 @@ class Circuit:
         steps: int,
         optimizer: Union[str, tf.optimizers.Optimizer] = "Adam",
         learning_rate: float = 0.001,
+        scheduler:bool = True
     ) -> LossHistoryCallback:
 
         if self._should_compile(optimizer, learning_rate):
@@ -103,14 +104,17 @@ class Circuit:
             data,
             output_types=(self._model.complextype, self._model.complextype),
             output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape))
-
+        
+        callbacks = [LossCallback(), ProgressBarCallback(steps), self._historycallback]
+        if scheduler:
+            callbacks.append(LearningRateScheduler(learning_rate))
         try:
             self._model.fit(
                 x=ds,
                 batch_size=len(self._inout_pairs),
                 steps_per_epoch=steps,
                 verbose=0,
-                callbacks=[LossCallback(), ProgressBarCallback(steps), self._historycallback, LearningRateScheduler(learning_rate)],
+                callbacks=callbacks,
                 max_queue_size=20,
                 workers=1,
                 use_multiprocessing=False,
