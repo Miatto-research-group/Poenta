@@ -20,7 +20,7 @@ from typing import Callable, Union, Iterable
 from collections import ChainMap
 from prettytable import PrettyTable
 
-from .keras import QuantumCircuit, ProgressBarCallback, LossHistoryCallback
+from .keras import QuantumCircuit, LossCallback, LearningRateScheduler, ProgressBarCallback, LossHistoryCallback
 
 
 class Circuit:
@@ -102,8 +102,8 @@ class Circuit:
             batch_size=len(self._inout_pairs),
             steps_per_epoch=steps,
             verbose=0,
-            callbacks=[ProgressBarCallback(steps, self._cumul_steps), history],
-            max_queue_size=20,
+            callbacks=[LossCallback(), ProgressBarCallback(steps, self._cumul_steps), history, LearningRateScheduler(learning_rate)],
+            max_queue_size=40,
             workers=1,
             use_multiprocessing=False,
         )

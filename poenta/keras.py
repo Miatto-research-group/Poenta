@@ -110,13 +110,12 @@ class ProgressBarCallback(tf.keras.callbacks.Callback):
 
 
 
-
 class LearningRateScheduler(tf.keras.callbacks.Callback):
     def __init__(self, initial_lr: float):
         super().__init__()
         self.initial_lr = initial_lr
         
-    def on_train_batch_end(self, batch, logs=None):
+    def on_train_batch_begin(self, batch, logs=None):
         tf.keras.backend.set_value(self.model.optimizer.lr, self.model._loss*self.initial_lr)
 
 
