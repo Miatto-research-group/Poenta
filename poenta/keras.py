@@ -17,7 +17,7 @@ import tensorflow as tf
 from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal
 from .parameters import Parameters
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
-from numpy import pi, cos
+from numpy import pi, cos, tanh
 
 
 class QuantumLayer(tf.keras.layers.Layer):
@@ -54,7 +54,8 @@ class QuantumCircuit(tf.keras.Sequential):
     def __init__(self, num_modes: int, num_layers: int, batch_size: int, cutoff: int, dtype: tf.DType):
         self.realtype, self.complextype = real_complex_types(dtype)
         self._loss = 1.0
-        self._batch_size = None
+        self._batch_size = batch_size
+        self._tot_batches = 0
         self.cutoff = cutoff
         super().__init__(
             [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
@@ -88,10 +89,9 @@ class LossCallback(tf.keras.callbacks.Callback):
 
 
 class ProgressBarCallback(tf.keras.callbacks.Callback):
-    def __init__(self, steps: int, init_step: int):
+    def __init__(self, steps: int):
         super().__init__()
         self.steps = steps
-        self.init_step = init_step
         self.task = None
         self.bar = Progress(
             TextColumn("Iteration {task.fields[iteration]}/{task.fields[cumul]}"),
@@ -104,21 +104,23 @@ class ProgressBarCallback(tf.keras.callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         self.task = self.task = self.bar.add_task(
-            description="Optimizing...", total=self.steps, iteration=self.init_step, loss=self.model._loss, cumul=self.steps+self.init_step, lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
+            description="Optimizing...", total=self.steps, iteration=self.model._tot_batches, loss=self.model._loss, cumul=self.steps+self.model._tot_batches, lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
         )
 
     def on_train_batch_end(self, batch, logs=None):
-        self.bar.update(self.task, advance=1, refresh=True, iteration=batch + 1 + self.init_step, loss=self.model._loss, lr=float(tf.keras.backend.get_value(self.model.optimizer.lr)))
+        self.model._tot_batches += 1
+        self.bar.update(self.task, advance=1, refresh=True, iteration=self.model._tot_batches, loss=self.model._loss, lr=float(tf.keras.backend.get_value(self.model.optimizer.lr)))
 
 
 
 class LearningRateScheduler(tf.keras.callbacks.Callback):
-    def __init__(self, initial_lr: float):
+    def __init__(self, initial_lr:float, min_lr:float = 0.00001):
         super().__init__()
         self.initial_lr = initial_lr
+        self.epsilon = initial_lr*(1-tanh(10.0))
         
     def on_train_batch_begin(self, batch, logs=None):
-        new_lr = max(self.model._loss * self.initial_lr, 0.00001)
+        new_lr = self.initial_lr*tanh(10.0*self.model._loss) + self.epsilon
         tf.keras.backend.set_value(self.model.optimizer.lr, new_lr)
 
 
