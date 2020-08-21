@@ -16,8 +16,8 @@
 import tensorflow as tf
 import numpy as np
 
-from .jitted import G_matrix
-from .experimental import dPsi, R_matrix
+from .jitted import G_matrix, G_matrix2
+from .experimental import dPsi, R_matrix, dPsi2, R_matrix2
 
 
 def complex_initializer(dtype):
@@ -95,14 +95,70 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
         return grad_gammac, grad_phi, grad_zc, grad_Psic
 
     return state_out, grad
-
+    
+    
+@tf.custom_gradient
+def GaussianTransformation2mode(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in, dtype = np.complex128):
+    """
+    Direct evolution of a quantum state
+    """
+    gamma1 = tf.convert_to_tensor(gamma1)
+    gamma2 = tf.convert_to_tensor(gamma2)
+    phi1 = tf.convert_to_tensor(phi1)
+    phi2 = tf.convert_to_tensor(phi2)
+    theta1 = tf.convert_to_tensor(theta1)
+    varphi1 = tf.convert_to_tensor(varphi1)
+    zeta1 = tf.convert_to_tensor(zeta1)
+    zeta2 = tf.convert_to_tensor(zeta2)
+    theta = tf.convert_to_tensor(theta)
+    varphi = tf.convert_to_tensor(varphi)
+    state_in = tf.convert_to_tensor(state_in)
+    cutoff = state_in.shape[1]
+    
+    dtype_c = state_in.dtype
+    dtype_r = phi.dtype
+    
+    R = tf.numpy_function(R_matrix2, [gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in], dtype_c)
+    state_out = R[..., ..., 0, 0]
+    
+    def grad(dy):
+        "Vector-Jacobian products for all the arguments (gamma, phi, theta1, varphi1, zeta, theta, varphi, Psi)"
+        G = tf.numpy_function(G_matrix2, [gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, cutoff], dtype_c)
+        
+        dPsi_dgamma1, dPsi_dgamma1c, dPsi_dgamma2, dPsi_dgamma2c, dPsi_dphi1, dPsi_dphi2, dPsi_dtheta1, dPsi_dvarphi1, dPsi_dzeta1, dPsi_dzeta1c, dPsi_dzeta2, dPsi_dzeta2c, dPsi_dtheta, dPsi_dvarphi = tf.numpy_function(dPsi2,[gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, Psi, G[0,0,:,:], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c))
+        
+        grad_gamma1c = tf.reduce_sum(dy*tf.math.conj(dPsi_dgamma1) + tf.math.conj(dy)*dPsi_dgamma1c)
+        grad_gamma2c = tf.reduce_sum(dy*tf.math.conj(dPsi_dgamma2) + tf.math.conj(dy)*dPsi_dgamma2c)
+        grad_zeta1c = tf.reduce_sum(dy*tf.math.conj(dPsi_dzeta1) + tf.math.conj(dy)*dPsi_dzeta1c)
+        grad_zeta2c = tf.reduce_sum(dy*tf.math.conj(dPsi_dzeta2) + tf.math.conj(dy)*dPsi_dzeta2c)
+        grad_phi1 = 2*tf.math.real(tf.reduce_sum(dy*tf.math.conj(dPsi_dphi1)))
+        grad_phi2 = 2*tf.math.real(tf.reduce_sum(dy*tf.math.conj(dPsi_dphi2)))
+        grad_theta1 = 2*tf.math.real(tf.reduce_sum(dy*tf.math.conj(dPsi_dtheta1)))
+        grad_varphi1 = 2*tf.math.real(tf.reduce_sum(dy*tf.math.conj(dPsi_dvarphi1)))
+        grad_theta = 2*tf.math.real(tf.reduce_sum(dy*tf.math.conj(dPsi_dtheta)))
+        grad_varphi = 2*tf.math.real(tf.reduce_sum(dy*tf.math.conj(dPsi_dvarphi)))
+        grad_Psic = tf.einsum("abcd,ab->cd",  tf.math.conj(G), dy)
+        
+        return grad_gamma1c, grad_gamma2c, grad_phi1, grad_phi2, grad_theta1, grad_varphi1, grad_zeta1c, grad_zeta2c, grad_theta, grad_varphi, grad_Psic
+    
+    return state_out, grad
 
 def KerrDiagonal(k, cutoff: int, dtype: tf.dtypes.DType):
     """
-    Returns the diagonal of the single-mode Kerr matrix
+    Returns the diagonal of the single-mode Kerr matrix (vector)
 
     Arguments:
         cutoff (int): the cutoff dimension of Fock space
         dtype (tf dtype): either tf.complex64 or tf.complex128
     """
     return tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff) ** 2)
+    
+def KerrDiagonalT(k, cutoff: int, dtype: tf.dtypes.DType):
+    """
+    Returns the diagonal of the single-mode Kerr matrix (colomn)
+
+    Arguments:
+        cutoff (int): the cutoff dimension of Fock space
+        dtype (tf dtype): either tf.complex64 or tf.complex128
+    """
+return tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff).reshape(-1,1) ** 2)
