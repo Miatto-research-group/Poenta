@@ -156,7 +156,7 @@ class Circuit:
             ax.title.set_text(f'Layer {k+1}')
             ax.set_ylim([1e-6, 1.1])
 
-            amplitudes = amplitudes[:min(cutoff, self._model.cutoff)]
+            amplitudes = amplitudes[:,:min(cutoff, self._model.cutoff)]
             probs = np.abs(amplitudes[0])**2
             phases = np.angle(amplitudes[0])
             ax.bar(range(len(probs)), probs, color=hue(phases/np.pi + 1.0))
