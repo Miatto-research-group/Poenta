@@ -79,19 +79,15 @@ class QuantumLayer(tf.keras.layers.Layer):
             self.kappa2 = self.add_weight(
                 "kappa2", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
             )
-            else:
-                print("number of modes is not valide!")
         super().build(input_shape)  # is this necessary?
 
     def call(self, input):
-        if num_modes == 1:
+        if self.num_modes == 1:
             gaussian_output = GaussianTransformation(self.gamma, self.phi, self.zeta, input)
             output = KerrDiagonal(self.kappa, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output
-        elif num_modes == 2:
+        elif self.num_modes == 2:
             gaussian_output = GaussianTransformation2mode(self.gamma1, self.gamma2, self.phi1, self.phi2, self.theta1, self.varphi1, self.zeta1, self.zeta2, self.theta, self.varphi, input)
             output = KerrDiagonalT(self.kappa1, self.cutoff, dtype=self.complextype) * gaussian_output * KerrDiagonal(self.kappa2, self.cutoff, dtype=self.complextype)
-        else:
-            print("number of modes is not valide!")
         output.set_shape(input.get_shape())
         return output
 
@@ -103,10 +99,16 @@ class QuantumCircuit(tf.keras.Sequential):
         self._batch_size = batch_size
         self._tot_batches = 0
         self.cutoff = cutoff
-        super().__init__(
-            [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
-            + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
-        )
+        if num_modes == 1:
+            super().__init__(
+                [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
+                + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
+            )
+        elif num_modes == 2:
+            super().__init__(
+                [tf.keras.Input(shape=[cutoff,cutoff], batch_size=batch_size, dtype=dtype)]
+                + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
+            )
 
 
 class LossCallback(tf.keras.callbacks.Callback):

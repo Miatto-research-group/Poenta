@@ -116,16 +116,17 @@ def GaussianTransformation2mode(gamma1, gamma2, phi1, phi2, theta1, varphi1, zet
     cutoff = state_in.shape[1]
     
     dtype_c = state_in.dtype
-    dtype_r = phi.dtype
+    dtype_r = phi1.dtype
     
     R = tf.numpy_function(R_matrix2, [gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in], dtype_c)
     state_out = R[..., ..., 0, 0]
+    print("tfutils, i get the state out:",state_out)
     
     def grad(dy):
-        "Vector-Jacobian products for all the arguments (gamma, phi, theta1, varphi1, zeta, theta, varphi, Psi)"
+        "Vector-Jacobian products for all the arguments (gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in)"
         G = tf.numpy_function(G_matrix2, [gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, cutoff], dtype_c)
         
-        dPsi_dgamma1, dPsi_dgamma1c, dPsi_dgamma2, dPsi_dgamma2c, dPsi_dphi1, dPsi_dphi2, dPsi_dtheta1, dPsi_dvarphi1, dPsi_dzeta1, dPsi_dzeta1c, dPsi_dzeta2, dPsi_dzeta2c, dPsi_dtheta, dPsi_dvarphi = tf.numpy_function(dPsi2,[gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, Psi, G[0,0,:,:], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c))
+        dPsi_dgamma1, dPsi_dgamma1c, dPsi_dgamma2, dPsi_dgamma2c, dPsi_dphi1, dPsi_dphi2, dPsi_dtheta1, dPsi_dvarphi1, dPsi_dzeta1, dPsi_dzeta1c, dPsi_dzeta2, dPsi_dzeta2c, dPsi_dtheta, dPsi_dvarphi = tf.numpy_function(dPsi2,[gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in, G[0,0,...,...], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c))
         
         grad_gamma1c = tf.reduce_sum(dy*tf.math.conj(dPsi_dgamma1) + tf.math.conj(dy)*dPsi_dgamma1c)
         grad_gamma2c = tf.reduce_sum(dy*tf.math.conj(dPsi_dgamma2) + tf.math.conj(dy)*dPsi_dgamma2c)
@@ -161,4 +162,4 @@ def KerrDiagonalT(k, cutoff: int, dtype: tf.dtypes.DType):
         cutoff (int): the cutoff dimension of Fock space
         dtype (tf dtype): either tf.complex64 or tf.complex128
     """
-return tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff).reshape(-1,1) ** 2)
+    return tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff).reshape(-1,1) ** 2)
