@@ -106,7 +106,7 @@ def dC_dmu_dSigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
     # dmu
     dmu_dgamma = np.array([1.0, 0.0], dtype=np.complex128)
     dmu_dgammac = np.array([exp2phidelta * tanhr, -eiphi / coshr])
-    dmu_dphi = np.array([2j * cgamma * exp2phidelta * tanhr, -1j * eiphi / coshr])
+    dmu_dphi = np.array([2j * cgamma * exp2phidelta * tanhr, -1j * cgamma * eiphi / coshr])
     dmu_dr = np.array([cgamma * exp2phidelta / coshr ** 2, cgamma * eiphi * tanhr / coshr,])
     dmu_ddelta = np.array([1j * cgamma * exp2phidelta * tanhr, 0.0])
     if r > 0.01:
