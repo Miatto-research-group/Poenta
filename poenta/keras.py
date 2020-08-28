@@ -14,7 +14,7 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import tensorflow as tf
-from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal, GaussianTransformation2mode, KerrDiagonalT
+from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal, GaussianTransformation2mode
 from .parameters import Parameters
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from numpy import pi, cos, tanh
@@ -87,7 +87,7 @@ class QuantumLayer(tf.keras.layers.Layer):
             output = KerrDiagonal(self.kappa, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output
         elif self.num_modes == 2:
             gaussian_output = GaussianTransformation2mode(self.gamma1, self.gamma2, self.phi1, self.phi2, self.theta1, self.varphi1, self.zeta1, self.zeta2, self.theta, self.varphi, input)
-            output = KerrDiagonalT(self.kappa1, self.cutoff, dtype=self.complextype) * gaussian_output * KerrDiagonal(self.kappa2, self.cutoff, dtype=self.complextype)
+            output = KerrDiagonal(self.kappa1, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output * KerrDiagonal(self.kappa2, self.cutoff, dtype=self.complextype)
         output.set_shape(input.get_shape())
         return output
 
@@ -106,7 +106,7 @@ class QuantumCircuit(tf.keras.Sequential):
             )
         elif num_modes == 2:
             super().__init__(
-                [tf.keras.Input(shape=[cutoff,cutoff], batch_size=batch_size, dtype=dtype)]
+                [tf.keras.Input(shape=(cutoff,cutoff,), batch_size=batch_size, dtype=dtype)]
                 + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
             )
 

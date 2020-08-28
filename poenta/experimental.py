@@ -89,13 +89,12 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
         theta(float): transmissivity angle of the beamsplitter
         varphi(float): reflection phase of the beamsplitter
         
-        Psi(np.array([batch,D,D])): State to be transformed
+        old_state(array([batch,D,D])): State to be transformed
 
     Returns:
         R (complex array[batch,D,D,D,D]): the matrix where R[batch,:,:,0,0] is the transformed state for each batch
     """
-    
-    batch, cutoff = old_state.shape[0], old_state.shape[1]
+    batch, cutoff, _ = old_state.shape
     dtype = old_state.dtype
     
     gamma1 = convert_scalar(gamma1)
@@ -133,7 +132,7 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
     for j in range(cutoff):
         G_00pq3 = G_00pq2
         for k in range(cutoff):
-            R[:,0,0,j,k] = np.sum(G_00pq3*Psi[:,j:,k:], axis = -1)
+            R[0,0,j,k] = np.sum(G_00pq3*old_state[:,j:,k:]) #!!here only works for batch = 1, if not the np.sum needs to be changed axis=-1 for several times = batch.
             G_00pq3 = G_00pq3[:,:-1]*sqrt[k+1:]
         G_00pq2 = sqrtT[j+1:]*G_00pq2[:-1,:]
 
@@ -227,15 +226,15 @@ def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varp
         theta(float): transmissivity angle of the beamsplitter
         varphi(float): reflection phase of the beamsplitter
         
-        Psi: (complex array): old state
-        G00 (complex array[D]): G[0,0,:,:] of the G matrix
-        R (complex array[D,D]): complete R matrix R[:,:,:,:] (!not really complete....)
+        state_in: (complex array[bath,D,D]): old state
+        G00 (complex array[D,D]): G[0,0,:,:] of the G matrix
+        R (complex array[D,D,D,D]): complete R matrix R[:,:,:,:] (!not really complete....)
 
     Returns:
-        (complex array[cutoff, cutoff, 14]): gradient of the new state with respect to
+        (complex array[batch, D, D, 14]): gradient of the new state with respect to
                                     gamma1, gamma1*, gamma2, gamma2*, phi1, phi2, theta1, varphi1, zeta1, zeta1*, zeta2, zeta2*, theta, varphi
     """
-    batch, cutoff = state_in.shape
+    batch, cutoff, _ = state_in.shape
     dtype = state_in.dtype
     
     C, mu, Sigma = C_mu_Sigma2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi)
@@ -244,7 +243,7 @@ def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varp
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
     sqrtT = sqrt.reshape(-1, 1)
     
-    dR = np.zeros((cutoff, cutoff, cutoff+1 , cutoff+1, 14),dtype = dtype)
+    dR = np.zeros((batch, cutoff, cutoff, cutoff+1 , cutoff+1, 14),dtype = dtype)
     dG00 = np.zeros((cutoff, cutoff, 14),dtype = dtype)
     
     dG00[0,0] = dC
@@ -260,7 +259,7 @@ def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varp
     for j in range(cutoff):
         dG003 = dG002
         for k in range(cutoff):
-            dR[0,0,j,k] = np.sum(dG003*Psi[j:,k:])
+            dR[:,0,0,j,k] = np.sum(dG003*state_in[:,j:,k:]) #only works for batch = 1!!!!!!
             dG003 = dG003[:,:-1]*sqrt[k+1:]
         dG002 = sqrtT[j+1:]*dG002[:-1,:]
             
@@ -268,13 +267,13 @@ def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varp
     for n in range(1,cutoff):
         for k in range(0,cutoff):
             for j in range(0,cutoff):
-                dR[0,n,j,k] = (dmu[1]*R[0,n-1,j,k] + mu[1]*dR[0,n-1,j,k] - dSigma[1,1]*sqrt[n-1]*R[0,n-2,j,k] - Sigma[1,1]*sqrt[n-1]*dR[0,n-2,j,k] - dSigma[1,2]*R[0,n-1,j+1,k] - Sigma[1,2]*dR[0,n-1,j+1,k] - dSigma[1,3]*R[0,n-1,j,k+1] - Sigma[1,3]*dR[0,n-1,j,k+1])/sqrt[n]
+                dR[:,0,n,j,k] = (dmu[1]*R[0,n-1,j,k] + mu[1]*dR[:,0,n-1,j,k] - dSigma[1,1]*sqrt[n-1]*R[0,n-2,j,k] - Sigma[1,1]*sqrt[n-1]*dR[:,0,n-2,j,k] - dSigma[1,2]*R[0,n-1,j+1,k] - Sigma[1,2]*dR[:,0,n-1,j+1,k] - dSigma[1,3]*R[0,n-1,j,k+1] - Sigma[1,3]*dR[:,0,n-1,j,k+1])/sqrt[n]
 
 
     for m in range(1,cutoff):
         for n in range(0,cutoff):
             for j in range(0,cutoff-m):
                 for k in range(0,cutoff-m-j):
-                    dR[m,n,j,k] = (dmu[0]*R[m-1,n,j,k] + mu[0]*dR[m-1,n,j,k] - dSigma[0,0]*sqrt[m-1]*R[m-2,n,j,k] - Sigma[0,0]*sqrt[m-1]*dR[m-2,n,j,k] - dSigma[0,1]*sqrt[n]*R[m-1,n-1,j,k] - Sigma[0,1]*sqrt[n]*dR[m-1,n-1,j,k] - dSigma[0,2]*R[m-1,n,j+1,k] - Sigma[0,2]*dR[m-1,n,j+1,k] - dSigma[0,3]*R[m-1,n,j,k+1] - Sigma[0,3]*dR[m-1,n,j,k+1])/sqrt[m]
+                    dR[:,m,n,j,k] = (dmu[0]*R[m-1,n,j,k] + mu[0]*dR[:,m-1,n,j,k] - dSigma[0,0]*sqrt[m-1]*R[m-2,n,j,k] - Sigma[0,0]*sqrt[m-1]*dR[:,m-2,n,j,k] - dSigma[0,1]*sqrt[n]*R[m-1,n-1,j,k] - Sigma[0,1]*sqrt[n]*dR[:,m-1,n-1,j,k] - dSigma[0,2]*R[m-1,n,j+1,k] - Sigma[0,2]*dR[:,m-1,n,j+1,k] - dSigma[0,3]*R[m-1,n,j,k+1] - Sigma[0,3]*dR[:,m-1,n,j,k+1])/sqrt[m]
            
-    return np.transpose(dR[:,:,0,0])
+    return np.transpose(dR[:,:,:,0,0])
