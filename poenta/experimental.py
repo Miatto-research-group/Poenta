@@ -91,7 +91,7 @@ def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0
     dG0[0] = dC
     for n in range(1, cutoff):
         dG0[n] = (
-            dmu[1] / sqrt[n] * G0[n - 1]
+              dmu[1] / sqrt[n] * G0[n - 1]
             - dSigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2]
             + mu[1] / sqrt[n] * dG0[n - 1]
             - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * dG0[n - 2]
@@ -104,7 +104,7 @@ def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0
 
     # second row of dR matrix
     dR[:, 1, :-1] = (
-        ed(R[:, 0, :-1], 2) * ed(ed(dmu[0], 0), 1)
+        ed(R[:, 0, :-1], 2) * ed(ed(dmu[0], 0), 0)
         - ed(R[:, 0, 1:], 2) * ed(ed(dSigma[0, 1], 0), 0)
         + mu[0] * dR[:, 0, :-1]
         - Sigma[0, 1] * dR[:, 0, 1:]
@@ -113,7 +113,7 @@ def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0
     # rest of dR matrix
     for m in range(2, cutoff):
         dR[:, m, :-m] = (
-            ed(R[:, m - 1, :-m], 2) * ed(ed(dmu[0], 0), 1)
+            ed(R[:, m - 1, :-m], 2) * ed(ed(dmu[0], 0), 0)
             - sqrt[m - 1] * ed(R[:, m - 2, :-m], 2) * ed(ed(dSigma[0, 0], 0), 0)
             - ed(R[:, m - 1, 1 : -m + 1], 2) * ed(ed(dSigma[0, 1], 0), 0)
             + mu[0] * dR[:, m - 1, :-m]
@@ -121,4 +121,4 @@ def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0
             - Sigma[0, 1] * dR[:, m - 1, 1 : -m + 1]
         ) / sqrt[m]
 
-    return list(np.transpose(dR[:, :, 0], (2, 0, 1)))
+    return list(np.transpose(dR[:, :, 0, :], (2, 0, 1)))

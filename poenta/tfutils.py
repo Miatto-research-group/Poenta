@@ -91,7 +91,7 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
         grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
-        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True)
+        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True) # mat-vec mult on last index of both
         return grad_gammac, grad_phi, grad_zc, grad_Psic
 
     return state_out, grad

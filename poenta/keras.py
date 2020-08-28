@@ -15,7 +15,7 @@
 
 import tensorflow as tf
 from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal
-from .parameters import Parameters
+
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from numpy import pi, cos, tanh
 
