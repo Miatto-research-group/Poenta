@@ -228,7 +228,7 @@ def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varp
         
         state_in: (complex array[bath,D,D]): old state
         G00 (complex array[D,D]): G[0,0,:,:] of the G matrix
-        R (complex array[D,D,D,D]): complete R matrix R[:,:,:,:] (!not really complete....)
+        R (complex array[bath, D,D,D,D]): complete R matrix R[:,:,:,:] (!not really complete....)
 
     Returns:
         (complex array[batch, D, D, 14]): gradient of the new state with respect to
@@ -259,15 +259,19 @@ def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varp
     for j in range(cutoff):
         dG003 = dG002
         for k in range(cutoff):
-            dR[:,0,0,j,k] = np.sum(dG003*state_in[:,j:,k:]) #only works for batch = 1!!!!!!
-            dG003 = dG003[:,:-1]*sqrt[k+1:]
-        dG002 = sqrtT[j+1:]*dG002[:-1,:]
+        #dG003[D,D,14]*state_in[batch,D,D] - > we want [batch,14]
+            test = ed(dG003,0)*ed(state_in[:,j:,k:],-1)
+            dR[:,0,0,j,k] = test.sum(axis=1).sum(axis=1)
+            dG003 = dG003[:,:-1]*ed(sqrt[k+1:],1)
+        dG002 = ed(sqrtT[j+1:],1)*dG002[:-1,:]
             
 
     for n in range(1,cutoff):
         for k in range(0,cutoff):
             for j in range(0,cutoff):
-                dR[:,0,n,j,k] = (dmu[1]*R[0,n-1,j,k] + mu[1]*dR[:,0,n-1,j,k] - dSigma[1,1]*sqrt[n-1]*R[0,n-2,j,k] - Sigma[1,1]*sqrt[n-1]*dR[:,0,n-2,j,k] - dSigma[1,2]*R[0,n-1,j+1,k] - Sigma[1,2]*dR[:,0,n-1,j+1,k] - dSigma[1,3]*R[0,n-1,j,k+1] - Sigma[1,3]*dR[:,0,n-1,j,k+1])/sqrt[n]
+            #dR[batch,D,D,D,D,14] R[D,D,D,D] dmu[4,14] dSigma[4,4,14]
+                dR[:,0,n,j,k] = (dmu[1]*R[0,n-1,j,k] + ed(mu[1],0)*dR[:,0,n-1,j,k] - dSigma[1,1]*sqrt[n-1]*R[0,n-2,j,k] - Sigma[1,1]*sqrt[n-1]*dR[:,0,n-2,j,k] - dSigma[1,2]*R[0,n-1,j+1,k] - Sigma[1,2]*dR[:,0,n-1,j+1,k] - dSigma[1,3]*R[0,n-1,j,k+1] - Sigma[1,3]*dR[:,0,n-1,j,k+1]
+                                )/sqrt[n]
 
 
     for m in range(1,cutoff):
