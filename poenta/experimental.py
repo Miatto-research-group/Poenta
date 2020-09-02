@@ -114,7 +114,7 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
     sqrtT = sqrt.reshape(-1, 1)
 
     R = np.zeros((batch, cutoff, cutoff, cutoff+1, cutoff+1), dtype = dtype)
-    G_00pq = np.zeros((cutoff, cutoff), dtype = dtype)
+    G_00pq = np.zeros((cutoff, cutoff+1), dtype = dtype)
     
     
     #G_mn00
@@ -126,21 +126,24 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
     for p in range(1,cutoff):
         for q in range(0,cutoff):
             G_00pq[p,q] = (mu[2]*G_00pq[p-1,q] - Sigma[2,2]*sqrt[p-1]*G_00pq[p-2,q] - Sigma[2,3]*sqrt[q]*G_00pq[p-1,q-1])/sqrt[p]
-                    
+                
     # R_00^jk = a_dagger^j \G_00pq> b^k  * |old_state>
-    G_00pq2 = G_00pq
+    G_00pq2 = G_00pq[:,:-1]
     for j in range(cutoff):
         G_00pq3 = G_00pq2
         for k in range(cutoff):
-            R[0,0,j,k] = np.sum(G_00pq3*old_state[:,j:,k:]) #!!here only works for batch = 1, if not the np.sum needs to be changed axis=-1 for several times = batch.
+            R[0,0,j,k] = np.sum(G_00pq3*old_state[:,j:,k:])
             G_00pq3 = G_00pq3[:,:-1]*sqrt[k+1:]
         G_00pq2 = sqrtT[j+1:]*G_00pq2[:-1,:]
 
     #R_0n^jk
+#    for n in range(1,cutoff):
+#        for k in range(0,cutoff):
+#            for j in range(0,cutoff):
+#                R[:,0,n,j,k] = mu[1]/sqrt[n]*R[:,0,n-1,j,k] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[:,0,n-2,j,k] - Sigma[1,2]/sqrt[n]*R[:,0,n-1,j+1,k] - Sigma[1,3]/sqrt[n]*R[:,0,n-1,j,k+1]
     for n in range(1,cutoff):
-        for k in range(0,cutoff):
-            for j in range(0,cutoff):
-                R[:,0,n,j,k] = mu[1]/sqrt[n]*R[:,0,n-1,j,k] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[:,0,n-2,j,k] - Sigma[1,2]/sqrt[n]*R[:,0,n-1,j+1,k] - Sigma[1,3]/sqrt[n]*R[:,0,n-1,j,k+1]
+        R[:,0,n,:-1,:-1] = mu[1]/sqrt[n]*R[:,0,n-1,:-1,:-1] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[:,0,n-2,:-1,:-1] - Sigma[1,2]/sqrt[n]*R[:,0,n-1,1:,:-1] - Sigma[1,3]/sqrt[n]*R[:,0,n-1,:-1,1:]
+
 
     #R_mn^jk
     for m in range(1,cutoff):
@@ -264,20 +267,21 @@ def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varp
             dR[:,0,0,j,k] = test.sum(axis=1).sum(axis=1)
             dG003 = dG003[:,:-1]*ed(sqrt[k+1:],1)
         dG002 = ed(sqrtT[j+1:],1)*dG002[:-1,:]
-            
 
     for n in range(1,cutoff):
         for k in range(0,cutoff):
             for j in range(0,cutoff):
-            #dR[batch,D,D,D,D,14] R[D,D,D,D] dmu[4,14] dSigma[4,4,14]
-                dR[:,0,n,j,k] = (dmu[1]*R[0,n-1,j,k] + ed(mu[1],0)*dR[:,0,n-1,j,k] - dSigma[1,1]*sqrt[n-1]*R[0,n-2,j,k] - Sigma[1,1]*sqrt[n-1]*dR[:,0,n-2,j,k] - dSigma[1,2]*R[0,n-1,j+1,k] - Sigma[1,2]*dR[:,0,n-1,j+1,k] - dSigma[1,3]*R[0,n-1,j,k+1] - Sigma[1,3]*dR[:,0,n-1,j,k+1]
-                                )/sqrt[n]
+            #dR[batch,D,D,D,D,14] R[batch,D,D,D,D] dmu[4,14] dSigma[4,4,14]
+            # dR[:,0,n,j,k] = [batch,14]
+#                 dR[:,0,n,j,k] = (dmu[1]*R[:,0,n-1,j,k] + ed(mu[1],0)*dR[:,0,n-1,j,k] - dSigma[1,1]*sqrt[n-1]*R[:,0,n-2,j,k] - Sigma[1,1]*sqrt[n-1]*dR[:,0,n-2,j,k] - dSigma[1,2]*R[:,0,n-1,j+1,k] - Sigma[1,2]*dR[:,0,n-1,j+1,k] - dSigma[1,3]*R[:,0,n-1,j,k+1] - Sigma[1,3]*dR[:,0,n-1,j,k+1]
+#                                 )/sqrt[n]
+                dR[:,0,n,j,k] = (ed(dmu[1],0)*R[:,0,n-1,j,k]+ mu[1]*dR[:,0,n-1,j,k]-ed(dSigma[1,1],0)*sqrt[n-1]*R[:,0,n-2,j,k]-Sigma[1,1]*sqrt[n-1]*dR[:,0,n-2,j,k] - ed(dSigma[1,2],0)*R[:,0,n-1,j+1,k] - Sigma[1,2]*dR[:,0,n-1,j+1,k] -ed(dSigma[1,3],0)*R[:,0,n-1,j,k+1] - Sigma[1,3]*dR[:,0,n-1,j,k+1])/sqrt[n]
 
 
     for m in range(1,cutoff):
         for n in range(0,cutoff):
             for j in range(0,cutoff-m):
                 for k in range(0,cutoff-m-j):
-                    dR[:,m,n,j,k] = (dmu[0]*R[m-1,n,j,k] + mu[0]*dR[:,m-1,n,j,k] - dSigma[0,0]*sqrt[m-1]*R[m-2,n,j,k] - Sigma[0,0]*sqrt[m-1]*dR[:,m-2,n,j,k] - dSigma[0,1]*sqrt[n]*R[m-1,n-1,j,k] - Sigma[0,1]*sqrt[n]*dR[:,m-1,n-1,j,k] - dSigma[0,2]*R[m-1,n,j+1,k] - Sigma[0,2]*dR[:,m-1,n,j+1,k] - dSigma[0,3]*R[m-1,n,j,k+1] - Sigma[0,3]*dR[:,m-1,n,j,k+1])/sqrt[m]
-           
-    return np.transpose(dR[:,:,:,0,0])
+#                     dR[:,m,n,j,k] = (dmu[0]*R[m-1,n,j,k] + mu[0]*dR[:,m-1,n,j,k] - dSigma[0,0]*sqrt[m-1]*R[m-2,n,j,k] - Sigma[0,0]*sqrt[m-1]*dR[:,m-2,n,j,k] - dSigma[0,1]*sqrt[n]*R[m-1,n-1,j,k] - Sigma[0,1]*sqrt[n]*dR[:,m-1,n-1,j,k] - dSigma[0,2]*R[m-1,n,j+1,k] - Sigma[0,2]*dR[:,m-1,n,j+1,k] - dSigma[0,3]*R[m-1,n,j,k+1] - Sigma[0,3]*dR[:,m-1,n,j,k+1])/sqrt[m]
+                    dR[:,m,n,j,k] = (ed(dmu[0],0)*R[:,m-1,n,j,k] + mu[0]*dR[:,m-1,n,j,k]  - ed(dSigma[0,0],0)*sqrt[m-1]*R[:,m-2,n,j,k]  - Sigma[0,0]*sqrt[m-1]*dR[:,m-2,n,j,k]- ed(dSigma[0,1],0)*sqrt[n]*R[:,m-1,n-1,j,k] - Sigma[0,1]*sqrt[n]*dR[:,m-1,n-1,j,k] - ed(dSigma[0,2],0)*R[:,m-1,n,j+1,k] - Sigma[0,2]*dR[:,m-1,n,j+1,k]  - ed(dSigma[0,3],0)*R[:,m-1,n,j,k+1]  - Sigma[0,3]*dR[:,m-1,n,j,k+1])/sqrt[m]
+    return list(np.transpose(dR[:,:,:,0,0,:],(3,0,1,2)))
