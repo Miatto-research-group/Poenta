@@ -132,7 +132,10 @@ class Circuit:
 
         functor = tf.keras.backend.function([self._model.input], [layer.output for layer in self._model.layers])   # evaluation function
         if len(state_in.shape) == 1 and state_in.shape == self._inout_pairs[0].shape[1]:
-            state_in = state_in[None, :]
+            if self.num_modes == 1:
+                state_in = state_in[None, :]
+            elif self.num_modes ==2:
+                state_in = state_in[None,:,:]
 
         layer_outs = functor(state_in)
 
