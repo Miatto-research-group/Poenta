@@ -110,9 +110,11 @@ class Circuit:
         if scheduler:
             callbacks.append(LearningRateScheduler(learning_rate))
         try:
+            
             self._model.fit(
                 x=ds,
-                batch_size=len(self._inout_pairs),
+#                batch_size=len(self._inout_pairs),
+                batch_size=self._inout_pairs[0].shape[0],
                 steps_per_epoch=steps,
                 verbose=0,
                 callbacks=callbacks,
