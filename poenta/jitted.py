@@ -191,7 +191,7 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
     return R
 
 
-@njit
+# @njit
 def G_matrix(
     gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dtype: np.dtype = np.complex128
 ) -> np.array:
@@ -233,6 +233,50 @@ def G_matrix(
 
     return G
 
+@njit
+def dG_matrix(
+    gamma: np.complex, phi: np.float, z: np.complex, G: np.array) -> np.array:
+    """
+    Constructs the Gaussian transformation recursively
+
+    Arguments:
+        gamma (complex): displacement parameter
+        phi (float): phase rotation parameter
+        zeta (complex): squeezing parameter
+        G (complex array[cutoff, cutoff]): a copy of the gate
+
+    Returns:
+        dG (complex array[5, cutoff, cutoff]): the gradient of G with respect to gamma,gamma*,phi,z,z*
+    """
+    z = convert_scalar(z)
+    phi = convert_scalar(phi)
+    gamma = convert_scalar(gamma)
+    cutoff = G.shape[0]
+    dtype = G.dtype
+    sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
+
+    C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
+    dC, dmu, dSigma = dC_dmu_dSigma(gamma, phi, z)
+    dG = np.zeros((cutoff, cutoff, 5), dtype=dtype)
+
+    # First column
+    dG[0, 0] = dC
+    for m in range(cutoff - 1):
+        dG[m + 1, 0] = mu[0] / sqrt[m + 1] * dG[m, 0] + dmu[0] / sqrt[m + 1] * G[m, 0] - Sigma[0, 0] * sqrt[m] / sqrt[m + 1] * dG[m - 1, 0] - dSigma[0, 0] * sqrt[m] / sqrt[m + 1] * G[m - 1, 0]
+
+    # All rows
+    for m in range(cutoff):
+        for n in range(cutoff - 1):
+            dG[m, n + 1] = (
+                mu[1] / sqrt[n + 1] * dG[m, n]
+                - Sigma[1, 0] * sqrt[m] / sqrt[n + 1] * dG[m - 1, n]
+                - Sigma[1, 1] * sqrt[n] / sqrt[n + 1] * dG[m, n - 1]
+            +   dmu[1] / sqrt[n + 1] * G[m, n]
+                - dSigma[1, 0] * sqrt[m] / sqrt[n + 1] * G[m - 1, n]
+                - dSigma[1, 1] * sqrt[n] / sqrt[n + 1] * G[m, n - 1]
+            )
+
+    return list(np.transpose(dG, (2, 0, 1)))
 
 # Extras
 @njit
