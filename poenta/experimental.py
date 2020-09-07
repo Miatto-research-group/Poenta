@@ -176,7 +176,7 @@ def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0
     dG0[0] = dC
     for n in range(1, cutoff):
         dG0[n] = (
-            dmu[1] / sqrt[n] * G0[n - 1]
+              dmu[1] / sqrt[n] * G0[n - 1]
             - dSigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2]
             + mu[1] / sqrt[n] * dG0[n - 1]
             - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * dG0[n - 2]
@@ -189,7 +189,7 @@ def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0
 
     # second row of dR matrix
     dR[:, 1, :-1] = (
-        ed(R[:, 0, :-1], 2) * ed(ed(dmu[0], 0), 1)
+        ed(R[:, 0, :-1], 2) * ed(ed(dmu[0], 0), 0)
         - ed(R[:, 0, 1:], 2) * ed(ed(dSigma[0, 1], 0), 0)
         + mu[0] * dR[:, 0, :-1]
         - Sigma[0, 1] * dR[:, 0, 1:]
@@ -198,7 +198,7 @@ def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0
     # rest of dR matrix
     for m in range(2, cutoff):
         dR[:, m, :-m] = (
-            ed(R[:, m - 1, :-m], 2) * ed(ed(dmu[0], 0), 1)
+            ed(R[:, m - 1, :-m], 2) * ed(ed(dmu[0], 0), 0)
             - sqrt[m - 1] * ed(R[:, m - 2, :-m], 2) * ed(ed(dSigma[0, 0], 0), 0)
             - ed(R[:, m - 1, 1 : -m + 1], 2) * ed(ed(dSigma[0, 1], 0), 0)
             + mu[0] * dR[:, m - 1, :-m]
@@ -206,6 +206,7 @@ def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0
             - Sigma[0, 1] * dR[:, m - 1, 1 : -m + 1]
         ) / sqrt[m]
 
+<<<<<<< HEAD
     return list(np.transpose(dR[:, :, 0], (2, 0, 1)))
 
 @njit()
@@ -285,3 +286,6 @@ def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varp
 #                     dR[:,m,n,j,k] = (dmu[0]*R[m-1,n,j,k] + mu[0]*dR[:,m-1,n,j,k] - dSigma[0,0]*sqrt[m-1]*R[m-2,n,j,k] - Sigma[0,0]*sqrt[m-1]*dR[:,m-2,n,j,k] - dSigma[0,1]*sqrt[n]*R[m-1,n-1,j,k] - Sigma[0,1]*sqrt[n]*dR[:,m-1,n-1,j,k] - dSigma[0,2]*R[m-1,n,j+1,k] - Sigma[0,2]*dR[:,m-1,n,j+1,k] - dSigma[0,3]*R[m-1,n,j,k+1] - Sigma[0,3]*dR[:,m-1,n,j,k+1])/sqrt[m]
                     dR[:,m,n,j,k] = (ed(dmu[0],0)*ed(R[:,m-1,n,j,k],1) + mu[0]*dR[:,m-1,n,j,k]  - ed(dSigma[0,0],0)*sqrt[m-1]*ed(R[:,m-2,n,j,k],1)  - Sigma[0,0]*sqrt[m-1]*dR[:,m-2,n,j,k]- ed(dSigma[0,1],0)*sqrt[n]*ed(R[:,m-1,n-1,j,k],1) - Sigma[0,1]*sqrt[n]*dR[:,m-1,n-1,j,k] - ed(dSigma[0,2],0)*ed(R[:,m-1,n,j+1,k],1) - Sigma[0,2]*dR[:,m-1,n,j+1,k]  - ed(dSigma[0,3],0)*ed(R[:,m-1,n,j,k+1],1)  - Sigma[0,3]*dR[:,m-1,n,j,k+1])/sqrt[m]
     return list(np.transpose(dR[:,:,:,0,0,:],(3,0,1,2)))
+=======
+    return list(np.transpose(dR[:, :, 0, :], (2, 0, 1)))
+>>>>>>> 7f4f1ade0299c7baf9c620e826ee5dc39db183f2
