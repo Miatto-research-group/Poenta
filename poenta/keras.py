@@ -14,13 +14,8 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import tensorflow as tf
-<<<<<<< HEAD
 from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal, GaussianTransformation2mode
-from .parameters import Parameters
-=======
 from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal
-
->>>>>>> 7f4f1ade0299c7baf9c620e826ee5dc39db183f2
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from numpy import pi, cos, tanh
 
