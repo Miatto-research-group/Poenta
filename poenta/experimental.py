@@ -114,7 +114,7 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
     sqrtT = sqrt.reshape(-1, 1)
 
     R = np.zeros((batch, cutoff, cutoff, cutoff+1, cutoff+1), dtype = dtype)
-    G_00pq = np.zeros((cutoff, cutoff+1), dtype = dtype)
+    G_00pq = np.zeros((cutoff, cutoff), dtype = dtype)
     
     
     #G_mn00
@@ -128,21 +128,21 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
             G_00pq[p,q] = (mu[2]*G_00pq[p-1,q] - Sigma[2,2]*sqrt[p-1]*G_00pq[p-2,q] - Sigma[2,3]*sqrt[q]*G_00pq[p-1,q-1])/sqrt[p]
                 
     # R_00^jk = a_dagger^j \G_00pq> b^k  * |old_state>
-    G_00pq2 = G_00pq[:,:-1]
+    G_00pq2 = G_00pq
     for j in range(cutoff):
         G_00pq3 = G_00pq2
         for k in range(cutoff):
-            R[0,0,j,k] = np.sum(G_00pq3*old_state[:,j:,k:])
+            R[:,0,0,j,k] = np.sum(G_00pq3*old_state[:,j:,k:])
             G_00pq3 = G_00pq3[:,:-1]*sqrt[k+1:]
         G_00pq2 = sqrtT[j+1:]*G_00pq2[:-1,:]
 
     #R_0n^jk
-#    for n in range(1,cutoff):
-#        for k in range(0,cutoff):
-#            for j in range(0,cutoff):
-#                R[:,0,n,j,k] = mu[1]/sqrt[n]*R[:,0,n-1,j,k] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[:,0,n-2,j,k] - Sigma[1,2]/sqrt[n]*R[:,0,n-1,j+1,k] - Sigma[1,3]/sqrt[n]*R[:,0,n-1,j,k+1]
     for n in range(1,cutoff):
-        R[:,0,n,:-1,:-1] = mu[1]/sqrt[n]*R[:,0,n-1,:-1,:-1] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[:,0,n-2,:-1,:-1] - Sigma[1,2]/sqrt[n]*R[:,0,n-1,1:,:-1] - Sigma[1,3]/sqrt[n]*R[:,0,n-1,:-1,1:]
+        for k in range(0,cutoff):
+            for j in range(0,cutoff):
+                R[:,0,n,j,k] = mu[1]/sqrt[n]*R[:,0,n-1,j,k] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[:,0,n-2,j,k] - Sigma[1,2]/sqrt[n]*R[:,0,n-1,j+1,k] - Sigma[1,3]/sqrt[n]*R[:,0,n-1,j,k+1]
+#    for n in range(1,cutoff):
+#        R[:,0,n,:-1,:-1] = mu[1]/sqrt[n]*R[:,0,n-1,:-1,:-1] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[:,0,n-2,:-1,:-1] - Sigma[1,2]/sqrt[n]*R[:,0,n-1,1:,:-1] - Sigma[1,3]/sqrt[n]*R[:,0,n-1,:-1,1:]
 
 
     #R_mn^jk
@@ -265,8 +265,8 @@ def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varp
         #dG003[D,D,14]*state_in[batch,D,D] - > we want [batch,14]
             test = ed(dG003,0)*ed(state_in[:,j:,k:],-1)
             dR[:,0,0,j,k] = test.sum(axis=1).sum(axis=1)
-            dG003 = dG003[:,:-1]*ed(sqrt[k+1:],1)
-        dG002 = ed(sqrtT[j+1:],1)*dG002[:-1,:]
+            dG003 = dG003[:,:-1]*sqrtT[k+1:]
+        dG002 = ed(ed(sqrt[j+1:],1),1)*dG002[:-1,:]
 
     for n in range(1,cutoff):
         for k in range(0,cutoff):

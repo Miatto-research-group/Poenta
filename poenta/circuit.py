@@ -25,7 +25,7 @@ from .keras import QuantumCircuit, LossCallback, LearningRateScheduler, Progress
 
 
 class Circuit:
-    def __init__(self, num_layers: int, num_modes: int, dtype: tf.dtypes.DType):
+    def __init__(self, num_layers: int, num_modes: int, num_seed: int, dtype: tf.dtypes.DType):
         self.num_layers = num_layers
         self.num_modes = num_modes
         self.dtype = dtype
@@ -38,7 +38,8 @@ class Circuit:
         self.__should_compile = True
         self.__schash = None
         
-        self.set_random_seed(665)
+#        self.set_random_seed(665)
+        self.set_random_seed(num_seed)
 
     def set_random_seed(self, n: int):
         tf.random.set_seed(n)
