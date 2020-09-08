@@ -109,6 +109,27 @@ class QuantumCircuit(tf.keras.Sequential):
                 [tf.keras.Input(shape=(cutoff,cutoff,), batch_size=batch_size, dtype=dtype)]
                 + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
             )
+            
+    def train_step(self,data):
+        #Override the method under the class keras.Model to apply Natural Gradient
+        x, y = data
+        
+        with tf.GradientTape() as tape:
+            y_pred = self(x, training = True)
+            loss = self.compiled_loss(
+                           y,
+                           y_pred,
+                           regularization_losses=self.losses,
+                       )
+                       
+        trainable_variables = self.trainable_variables
+        gradients = tape.gradient(loss, trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, trainable_variables))
+#        outputs = [layer.output for layer in self.layers]
+        #TODO: Apply Natural gradient
+        
+        self.compiled_metrics.update_state(y, y_pred)
+        return {m.name: m.result() for m in self.metrics}
 
 
 class LossCallback(tf.keras.callbacks.Callback):
