@@ -99,16 +99,20 @@ class QuantumCircuit(tf.keras.Sequential):
         self._batch_size = batch_size
         self._tot_batches = 0
         self.cutoff = cutoff
+        self._num_layers = num_layers
+        self._num_modes = num_modes
         if num_modes == 1:
             super().__init__(
                 [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
                 + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
             )
+            self._num_parameters_per_layer = 3
         elif num_modes == 2:
             super().__init__(
                 [tf.keras.Input(shape=(cutoff,cutoff,), batch_size=batch_size, dtype=dtype)]
                 + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
             )
+            self._num_parameters_per_layer = 12
             
     def train_step(self,data):
         #Override the method under the class keras.Model to apply Natural Gradient
@@ -121,12 +125,24 @@ class QuantumCircuit(tf.keras.Sequential):
                            y_pred,
                            regularization_losses=self.losses,
                        )
-                       
         trainable_variables = self.trainable_variables
         gradients = tape.gradient(loss, trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, trainable_variables))
-#        outputs = [layer.output for layer in self.layers]
         #TODO: Apply Natural gradient
+        with tf.GradientTape(persistent=True) as tape1:
+            outputs = [layer.output for layer in self.layers]
+        index = 0
+        for output in outputs:
+            print(output)
+            variables = trainable_variables[index*self._num_parameters_per_layer: (index+1)*self._num_parameters_per_layer]
+            print("varaiables:",variables)
+            gradients_output = tape1.gradient(output, variables)
+            print(gradients_output)
+            index += 1
+        
+        ###
+        self.optimizer.apply_gradients(zip(gradients, trainable_variables))
+
+        
         
         self.compiled_metrics.update_state(y, y_pred)
         return {m.name: m.result() for m in self.metrics}
