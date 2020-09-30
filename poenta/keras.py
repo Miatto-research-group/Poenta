@@ -14,8 +14,8 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import tensorflow as tf
+from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal, GaussianTransformation2mode
 from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal
-
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from numpy import pi, cos, tanh
 
@@ -29,23 +29,65 @@ class QuantumLayer(tf.keras.layers.Layer):
         self.complextype = complextype
 
     def build(self, input_shape):  # TODO: upgrade for 2 modes
-        self.gamma = self.add_weight(
-            "gamma", dtype=self.complextype, trainable=True, initializer=complex_initializer(self.complextype)
-        )
-        self.phi = self.add_weight(
-            "phi", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
-        )
-        self.zeta = self.add_weight(
-            "zeta", dtype=self.complextype, trainable=True, initializer=complex_initializer(self.complextype)
-        )
-        self.kappa = self.add_weight(
-            "kappa", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
-        )
+        if self.num_modes == 1:
+            self.gamma = self.add_weight(
+                "gamma", dtype=self.complextype, trainable=True, initializer=complex_initializer(self.complextype)
+            )
+            self.phi = self.add_weight(
+                "phi", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
+            self.zeta = self.add_weight(
+                "zeta", dtype=self.complextype, trainable=True, initializer=complex_initializer(self.complextype)
+            )
+            self.kappa = self.add_weight(
+                "kappa", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
+        elif self.num_modes == 2:
+            self.gamma1 = self.add_weight(
+                "gamma1", dtype=self.complextype, trainable=True, initializer=complex_initializer(self.complextype)
+            )
+            self.gamma2 = self.add_weight(
+                "gamma2", dtype=self.complextype, trainable=True, initializer=complex_initializer(self.complextype)
+            )
+            self.phi1 = self.add_weight(
+                "phi1", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
+            self.phi2 = self.add_weight(
+                "phi2", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
+            self.theta1 = self.add_weight(
+                "theta1", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
+            self.varphi1 = self.add_weight(
+                "varphi1", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
+            self.zeta1 = self.add_weight(
+                "zeta1", dtype=self.complextype, trainable=True, initializer=complex_initializer(self.complextype)
+            )
+            self.zeta2 = self.add_weight(
+                "zeta2", dtype=self.complextype, trainable=True, initializer=complex_initializer(self.complextype)
+            )
+            self.theta = self.add_weight(
+                "theta", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
+            self.varphi = self.add_weight(
+                "varphi", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
+            self.kappa1 = self.add_weight(
+                "kappa1", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
+            self.kappa2 = self.add_weight(
+                "kappa2", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
+            )
         super().build(input_shape)  # is this necessary?
 
     def call(self, input):
-        gaussian_output = GaussianTransformation(self.gamma, self.phi, self.zeta, input)
-        output = KerrDiagonal(self.kappa, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output
+        if self.num_modes == 1:
+            gaussian_output = GaussianTransformation(self.gamma, self.phi, self.zeta, input)
+            output = KerrDiagonal(self.kappa, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output
+        elif self.num_modes == 2:
+            gaussian_output = GaussianTransformation2mode(self.gamma1, self.gamma2, self.phi1, self.phi2, self.theta1, self.varphi1, self.zeta1, self.zeta2, self.theta, self.varphi, input)
+            output = KerrDiagonal(self.kappa1, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output * KerrDiagonal(self.kappa2, self.cutoff, dtype=self.complextype)
         output.set_shape(input.get_shape())
         return output
 
@@ -57,10 +99,16 @@ class QuantumCircuit(tf.keras.Sequential):
         self._batch_size = batch_size
         self._tot_batches = 0
         self.cutoff = cutoff
-        super().__init__(
-            [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
-            + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
-        )
+        if num_modes == 1:
+            super().__init__(
+                [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
+                + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
+            )
+        elif num_modes == 2:
+            super().__init__(
+                [tf.keras.Input(shape=(cutoff,cutoff,), batch_size=batch_size, dtype=dtype)]
+                + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
+            )
 
 
 class LossCallback(tf.keras.callbacks.Callback):

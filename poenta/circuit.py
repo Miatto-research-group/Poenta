@@ -25,8 +25,9 @@ from .keras import QuantumCircuit, LossCallback, LearningRateScheduler, Progress
 
 
 class Circuit:
-    def __init__(self, num_layers: int, dtype: tf.dtypes.DType):
+    def __init__(self, num_layers: int, num_modes: int, num_seed: int, dtype: tf.dtypes.DType):
         self.num_layers = num_layers
+        self.num_modes = num_modes
         self.dtype = dtype
 
         self._model: QuantumCircuit
@@ -37,7 +38,8 @@ class Circuit:
         self.__should_compile = True
         self.__schash = None
         
-        self.set_random_seed(665)
+#        self.set_random_seed(665)
+        self.set_random_seed(num_seed)
 
     def set_random_seed(self, n: int):
         tf.random.set_seed(n)
@@ -49,7 +51,7 @@ class Circuit:
         states_out = tf.convert_to_tensor(states_out, dtype=self.dtype)
         self._inout_pairs = (states_in, states_out)
         self._model = QuantumCircuit(
-            num_modes=1,
+            num_modes=self.num_modes,
             num_layers=self.num_layers,
             batch_size=states_in.shape[0],
             cutoff=states_in.shape[1],
@@ -101,17 +103,19 @@ class Circuit:
             for i in range(steps):
                 yield self._inout_pairs
         ds = tf.data.Dataset.from_generator(
-            data,
-            output_types=(self._model.complextype, self._model.complextype),
-            output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape))
-        
+                data,
+                output_types=(self._model.complextype, self._model.complextype),
+                output_shapes=(self._inout_pairs[0].shape, self._inout_pairs[1].shape))
+
         callbacks = [LossCallback(), ProgressBarCallback(steps), self._historycallback]
         if scheduler:
             callbacks.append(LearningRateScheduler(learning_rate))
         try:
+            
             self._model.fit(
                 x=ds,
-                batch_size=len(self._inout_pairs),
+#                batch_size=len(self._inout_pairs),
+                batch_size=self._inout_pairs[0].shape[0],
                 steps_per_epoch=steps,
                 verbose=0,
                 callbacks=callbacks,
@@ -131,7 +135,10 @@ class Circuit:
 
         functor = tf.keras.backend.function([self._model.input], [layer.output for layer in self._model.layers])   # evaluation function
         if len(state_in.shape) == 1 and state_in.shape == self._inout_pairs[0].shape[1]:
-            state_in = state_in[None, :]
+            if self.num_modes == 1:
+                state_in = state_in[None, :]
+            elif self.num_modes ==2:
+                state_in = state_in[None,:,:]
 
         layer_outs = functor(state_in)
 
