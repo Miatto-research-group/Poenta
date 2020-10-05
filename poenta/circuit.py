@@ -129,6 +129,19 @@ class Circuit:
             plt.plot(self._historycallback.losses)
         
         return self._historycallback
+        
+    def show_final_state(self, state_in):
+        state_in = tf.convert_to_tensor(state_in)
+        functor = tf.keras.backend.function([self._model.input], [layer.output for layer in self._model.layers])   # evaluation function
+        if len(state_in.shape) == 1 and state_in.shape == self._inout_pairs[0].shape[1]:
+            if self.num_modes == 1:
+                state_in = state_in[None, :]
+            elif self.num_modes ==2:
+                state_in = state_in[None,:,:]
+
+        layer_outs = functor(state_in)
+        
+        return layer_outs[-1][0]
 
     def show_evolution(self, state_in:Union[tf.Tensor, np.array], figsize:tuple = (17,6), cutoff:int = 20, logy:bool = False):
         state_in = tf.convert_to_tensor(state_in)
