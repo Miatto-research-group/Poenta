@@ -133,10 +133,11 @@ class Circuit:
     def show_final_state(self, state_in):
         state_in = tf.convert_to_tensor(state_in)
         functor = tf.keras.backend.function([self._model.input], [layer.output for layer in self._model.layers])   # evaluation function
-        if len(state_in.shape) == 1 and state_in.shape == self._inout_pairs[0].shape[1]:
-            if self.num_modes == 1:
-                state_in = state_in[None, :]
-            elif self.num_modes ==2:
+        print("state_in.shape",state_in.shape)
+        print("self._inout_pairs[0].shape[1]",self._inout_pairs[0].shape[1])
+        if len(state_in.shape) == 1 and self.num_modes == 1:
+            state_in = state_in[None, :]
+        elif len(state_in.shape) == 2 and self.num_modes ==2:
                 state_in = state_in[None,:,:]
 
         layer_outs = functor(state_in)
