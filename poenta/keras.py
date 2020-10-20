@@ -118,8 +118,9 @@ class QuantumCircuit(tf.keras.Sequential):
         #Override the method under the class keras.Model to apply Natural Gradient
         x, y = data
         
-        with tf.GradientTape() as tape:
+        with tf.GradientTape(persistent=True) as tape:
             y_pred = self(x, training = True)
+            print("y_pred_size",y_pred.shape)
             loss = self.compiled_loss(
                            y,
                            y_pred,
@@ -127,18 +128,21 @@ class QuantumCircuit(tf.keras.Sequential):
                        )
         trainable_variables = self.trainable_variables
         gradients = tape.gradient(loss, trainable_variables)
-        #TODO: Apply Natural gradient
-        with tf.GradientTape(persistent=True) as tape1:
-            outputs = [layer.output for layer in self.layers]
-        index = 0
-        for output in outputs:
-            print(output)
-            variables = trainable_variables[index*self._num_parameters_per_layer: (index+1)*self._num_parameters_per_layer]
-            print("varaiables:",variables)
-            gradients_output = tape1.gradient(output, variables)
-            print(gradients_output)
-            index += 1
+        gradients_ypred = tape.gradient(y_pred[1,0,0], trainable_variables)
         
+        #TODO: Apply Natural gradient
+#        with tf.GradientTape(persistent=True) as tape1:
+#            outputs = [layer.output for layer in self.layers]
+#        index = 0
+#        for output in outputs:
+##            print(output)
+#            variables_inlayer = trainable_variables[index*self._num_parameters_per_layer: (index+1)*self._num_parameters_per_layer]
+#            print("varaiables:",variables_inlayer)
+#            gradients_output = tape1.gradient(output, variables_inlayer)
+#            print("grad_output:",gradients_output)
+#            index += 1
+        print("gradients:",gradients_ypred)
+
         ###
         self.optimizer.apply_gradients(zip(gradients, trainable_variables))
 
