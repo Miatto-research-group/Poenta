@@ -169,7 +169,6 @@ class LearningRateScheduler(tf.keras.callbacks.Callback):
         
     def on_train_batch_begin(self, batch, logs=None):
         new_lr = self.initial_lr*tanh(10.0*self.model._loss) + self.epsilon
-#        new_lr = self.initial_lr
         tf.keras.backend.set_value(self.model.optimizer.lr, new_lr)
 
 

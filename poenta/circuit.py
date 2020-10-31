@@ -127,9 +127,9 @@ class Circuit:
             print("Graciously interrupting the training...")
         finally:
             plt.plot(self._historycallback.losses)
-            ###########
-        print("loss is:",self._historycallback.losses[-1])
-            ###########
+#            ###########
+#        print("loss is:",self._historycallback.losses[-1])
+#            ###########
         return self._historycallback
         
     def show_final_state(self, state_in):
