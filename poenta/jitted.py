@@ -542,6 +542,56 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
     return R
 
 @njit
+def large_squeezing(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_state: np.array) -> np.array:
+    """
+    Directly constructs the transformed state recursively and exactly.
+
+    Arguments:
+        gamma (complex): displacement parameter
+        phi (float): phase rotation parameter
+        z (complex): squeezing parameter
+        old_state (complex array[D]): State to be transformed
+
+    Returns:
+        R (complex array[D,D]): the matrix whose 1st column is the transformed state
+    """
+    z = convert_scalar(z)
+    phi = convert_scalar(phi)
+    gamma = convert_scalar(gamma)
+    cutoff = convert_scalar(cutoff)
+
+    dtype = old_state.dtype
+    
+    r = np.abs(z)
+    delta = np.angle(z)
+    e_idelta = np.exp(1j*delta)
+    tanhr = np.tanh(r)
+    sechr = 1/np.cosh(r)
+
+    C = np.sqrt(1/np.cosh(r))
+#    mu = np.array([0,0], dtype=dtype)
+    Sigma = np.array([[e_idelta * tanhr, -sechr],[-sechr, -1/e_idelta * tanhr]],dtype=dtype)
+
+    sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
+    
+    R = np.zeros((cutoff, cutoff), dtype=dtype)
+    G0 = np.zeros(cutoff, dtype=dtype)
+
+    # first row of Transformation matrix
+    G0[0] = C
+    for n in range(1, cutoff):
+        G0[n] = - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2]
+
+    R[0,0] = np.dot(G0,old_state)
+    
+    for m in range(2,cutoff,2):
+        R[m,0] = - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, 0]
+
+    return R
+
+
+
+@njit
 def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, old_state):
     """
     Directly constructs the transformed state recursively and exactly.
