@@ -54,16 +54,17 @@ def real_complex_types(dtype: tf.dtypes.DType):
 
 
 @tf.custom_gradient
-def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, state_in: tf.Tensor) -> tf.Tensor:
+def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, kappa: tf.Variable, state_in: tf.Tensor) -> tf.Tensor:
     """
-    Evolution of a single-mode quantum state through a Gaussian transformation parametrized
-    by the three parameters gamma, phi and z.
+    Evolution of a single-mode quantum state through a Gaussian transformation parametrized by the three parameters gamma, phi and z
+        and a Non-Gaussian transformation parametrized by kappa.
     This is a differentiable function that can be safely used in a TensorFlow computation.
 
     Arguments:
         gamma (complex): displacement parameter
         phi (float): phase rotation
         z (complex): squeezing parameter
+        kappa (complex): Kerr parameter
         state_in (complex array[D]): input state of dimension D
     
     Returns:
@@ -73,6 +74,7 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
     gamma = tf.convert_to_tensor(gamma)
     phi = tf.convert_to_tensor(phi)
     z = tf.convert_to_tensor(z)
+    kappa = tf.convert_to_tensor(kappa)
     state_in = tf.convert_to_tensor(state_in)
     cutoff = state_in.shape[1]
 
@@ -80,7 +82,9 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
     dtype_r = phi.dtype
 
     R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
-    state_out = R[..., 0]
+    gaussian_output = R[..., 0]
+
+    state_out = KerrDiagonal(kappa, cutoff, dtype= dtype_c)[None, :] * gaussian_output
 
     def grad(dy):
         "Vector-Jacobian products for all the arguments (gamma, phi, z, Psi)"
@@ -88,19 +92,48 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
         dPsi_dgamma, dPsi_dgammac, dPsi_dphi, dPsi_dz, dPsi_dzc = tf.numpy_function(
             dPsi, [gamma, phi, z, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c)
         )
+        
+        ##TODO: dPsi_dkappa
+        dPsi_dkappa = grad_KerrDiagonal(kappa, cutoff, dtype= dtype_c)[None, :] * gaussian_output
+        
+        ##TODO: G_C matrix
+        
         grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
+        grad_k = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa)))
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
+        
+        
         grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True) # mat-vec mult on last index of both
-        return grad_gammac, grad_phi, grad_zc, grad_Psic
+        return grad_gammac, grad_phi, grad_zc, grad_k, grad_Psic
 
     return state_out, grad
     
     
 @tf.custom_gradient
-def GaussianTransformation2mode(gamma1: tf.Variable, gamma2: tf.Variable, phi1: tf.Variable, phi2: tf.Variable, theta1: tf.Variable, varphi1: tf.Variable, zeta1: tf.Variable, zeta2: tf.Variable, theta: tf.Variable, varphi: tf.Variable, state_in: tf.Tensor, dtype = np.complex128) -> tf.Tensor:
+def LayerTransformation2mode(gamma1: tf.Variable, gamma2: tf.Variable, phi1: tf.Variable, phi2: tf.Variable, theta1: tf.Variable, varphi1: tf.Variable, zeta1: tf.Variable, zeta2: tf.Variable, theta: tf.Variable, varphi: tf.Variable, kappa1: tf.Variable, kappa2: tf.Variable, state_in: tf.Tensor, dtype = np.complex128) -> tf.Tensor:
     """
-    Direct evolution of a quantum state
+    Evolution of a two-mode quantum state through a Gaussian transformation parametrized by the ten parameters gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi
+        and a Non-Gaussian transformation parametrized by kappa1 and kappa2.
+    This is a differentiable function that can be safely used in a TensorFlow computation.
+
+    Arguments:
+        gamma1 (complex): displacement parameter on the first mode
+        gamma2 (complex): displacement parameter on the second mode
+        phi1 (float): phase rotation on the first mode
+        phi2 (float): phase rotation on the second mode
+        theta1 (float) : Beamsplitter1 parameter
+        varphi1 (float) : Beamsplitter1 parameter
+        zeta1 (complex): squeezing parameter on the first mode
+        zeta2 (complex): squeezing parameter on the second mode
+        theta (float) : Beamsplitter2 parameter
+        varphi (float) : Beamsplitter2 parameter
+        kappa1 (complex): Kerr parameter on the first mode
+        kappa2 (complex): Kerr parameter on the second mode
+        state_in (complex array[D,D]): input state of dimension D*D
+    
+    Returns:
+        state_out (complex array[D*D]): output state of dimension D*D
     """
     gamma1 = tf.convert_to_tensor(gamma1)
     gamma2 = tf.convert_to_tensor(gamma2)
@@ -112,6 +145,8 @@ def GaussianTransformation2mode(gamma1: tf.Variable, gamma2: tf.Variable, phi1: 
     zeta2 = tf.convert_to_tensor(zeta2)
     theta = tf.convert_to_tensor(theta)
     varphi = tf.convert_to_tensor(varphi)
+    kappa1 = tf.convert_to_tensor(kappa1)
+    kappa2 = tf.convert_to_tensor(kappa2)
     state_in = tf.convert_to_tensor(state_in)
     cutoff = state_in.shape[1]
     
@@ -119,13 +154,18 @@ def GaussianTransformation2mode(gamma1: tf.Variable, gamma2: tf.Variable, phi1: 
     dtype_r = phi1.dtype
     
     R = tf.numpy_function(R_matrix2, [gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in], dtype_c)
-    state_out = R[:, :, :, 0, 0]
+    gaussian_output = R[:, :, :, 0, 0]
+    
+    state_out = KerrDiagonal(kappa1, cutoff, dtype=dtype_c)[None, :] * gaussian_output * KerrDiagonal(kappa2, cutoff, dtype=dtype_c)
+
     
     def grad(dy):
         "Vector-Jacobian products for all the arguments (gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in)"
         G = tf.numpy_function(G_matrix2, [gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, cutoff], dtype_c)
         
         dPsi_dgamma1, dPsi_dgamma1c, dPsi_dgamma2, dPsi_dgamma2c, dPsi_dphi1, dPsi_dphi2, dPsi_dtheta1, dPsi_dvarphi1, dPsi_dzeta1, dPsi_dzeta1c, dPsi_dzeta2, dPsi_dzeta2c, dPsi_dtheta, dPsi_dvarphi = tf.numpy_function(dPsi2,[gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in, G[0,0,:,:], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c))
+        
+        ##TODO: with kappa1 and kappa2
         
         grad_gamma1c = tf.reduce_sum(dy*tf.math.conj(dPsi_dgamma1) + tf.math.conj(dy)*dPsi_dgamma1c)
         grad_gamma2c = tf.reduce_sum(dy*tf.math.conj(dPsi_dgamma2) + tf.math.conj(dy)*dPsi_dgamma2c)
@@ -143,7 +183,7 @@ def GaussianTransformation2mode(gamma1: tf.Variable, gamma2: tf.Variable, phi1: 
     
     return state_out, grad
 
-def KerrDiagonal(k, cutoff: int, dtype: tf.dtypes.DType):
+def KerrDiagonal(k: tf.Variable, cutoff: int, dtype: tf.dtypes.DType):
     """
     Returns the diagonal of the single-mode Kerr matrix (vector)
 
@@ -152,4 +192,10 @@ def KerrDiagonal(k, cutoff: int, dtype: tf.dtypes.DType):
         dtype (tf dtype): either tf.complex64 or tf.complex128
     """
     return tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff) ** 2)
+    
+def grad_KerrDiagonal(k: tf.Variable, cutoff: int, dtype: tf.dtypes.DType):
+
+    return 1j*np.arange(cutoff) ** 2*tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff) ** 2)
+
+
     

@@ -14,8 +14,7 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import tensorflow as tf
-from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal, GaussianTransformation2mode
-from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal
+from .tfutils import real_complex_types, complex_initializer, real_initializer, LayerTransformation, LayerTransformation2mode
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from numpy import pi, cos, tanh
 
@@ -83,11 +82,10 @@ class QuantumLayer(tf.keras.layers.Layer):
 
     def call(self, input):
         if self.num_modes == 1:
-            gaussian_output = GaussianTransformation(self.gamma, self.phi, self.zeta, input)
-            output = KerrDiagonal(self.kappa, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output
+            output = LayerTransformation(self.gamma, self.phi, self.zeta, self.kappa, input)
+
         elif self.num_modes == 2:
-            gaussian_output = GaussianTransformation2mode(self.gamma1, self.gamma2, self.phi1, self.phi2, self.theta1, self.varphi1, self.zeta1, self.zeta2, self.theta, self.varphi, input)
-            output = KerrDiagonal(self.kappa1, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output * KerrDiagonal(self.kappa2, self.cutoff, dtype=self.complextype)
+            output = LayerTransformation2mode(self.gamma1, self.gamma2, self.phi1, self.phi2, self.theta1, self.varphi1, self.zeta1, self.zeta2, self.theta, self.varphi, self.kappa1, self.kappa2, input)
         output.set_shape(input.get_shape())
         return output
 
@@ -113,43 +111,43 @@ class QuantumCircuit(tf.keras.Sequential):
                 + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
             )
             self._num_parameters_per_layer = 12
-            
-    def train_step(self,data):
-        #Override the method under the class keras.Model to apply Natural Gradient
-        x, y = data
-        
-        with tf.GradientTape(persistent=True) as tape:
-            y_pred = self(x, training = True)
-            print("y_pred_size",y_pred.shape)
-            loss = self.compiled_loss(
-                           y,
-                           y_pred,
-                           regularization_losses=self.losses,
-                       )
-        trainable_variables = self.trainable_variables
-        gradients = tape.gradient(loss, trainable_variables)
-        gradients_ypred = tape.gradient(y_pred[1,0,0], trainable_variables)
-        
-        #TODO: Apply Natural gradient
-#        with tf.GradientTape(persistent=True) as tape1:
-#            outputs = [layer.output for layer in self.layers]
-#        index = 0
-#        for output in outputs:
-##            print(output)
-#            variables_inlayer = trainable_variables[index*self._num_parameters_per_layer: (index+1)*self._num_parameters_per_layer]
-#            print("varaiables:",variables_inlayer)
-#            gradients_output = tape1.gradient(output, variables_inlayer)
-#            print("grad_output:",gradients_output)
-#            index += 1
-        print("gradients:",gradients_ypred)
-
-        ###
-        self.optimizer.apply_gradients(zip(gradients, trainable_variables))
-
-        
-        
-        self.compiled_metrics.update_state(y, y_pred)
-        return {m.name: m.result() for m in self.metrics}
+#            
+#    def train_step(self,data):
+#        #Override the method under the class keras.Model to apply Natural Gradient
+#        x, y = data
+#        
+#        with tf.GradientTape(persistent=True) as tape:
+#            y_pred = self(x, training = True)
+#            print("y_pred_size",y_pred.shape)
+#            loss = self.compiled_loss(
+#                           y,
+#                           y_pred,
+#                           regularization_losses=self.losses,
+#                       )
+#        trainable_variables = self.trainable_variables
+#        gradients = tape.gradient(loss, trainable_variables)
+#        gradients_ypred = tape.gradient(y_pred[1,0,0], trainable_variables)
+#        
+#        #TODO: Apply Natural gradient
+##        with tf.GradientTape(persistent=True) as tape1:
+##            outputs = [layer.output for layer in self.layers]
+##        index = 0
+##        for output in outputs:
+###            print(output)
+##            variables_inlayer = trainable_variables[index*self._num_parameters_per_layer: (index+1)*self._num_parameters_per_layer]
+##            print("varaiables:",variables_inlayer)
+##            gradients_output = tape1.gradient(output, variables_inlayer)
+##            print("grad_output:",gradients_output)
+##            index += 1
+#        print("gradients:",gradients_ypred)
+#
+#        ###
+#        self.optimizer.apply_gradients(zip(gradients, trainable_variables))
+#
+#        
+#        
+#        self.compiled_metrics.update_state(y, y_pred)
+#        return {m.name: m.result() for m in self.metrics}
 
 
 class LossCallback(tf.keras.callbacks.Callback):
