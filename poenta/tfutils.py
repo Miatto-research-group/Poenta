@@ -96,6 +96,60 @@ def GaussianTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable,
         return grad_gammac, grad_phi, grad_zc, grad_Psic
 
     return state_out, grad
+
+
+@tf.custom_gradient
+def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, kappa: tf.Variable, state_in: tf.Tensor) -> tf.Tensor:
+    """
+    Evolution of a single-mode quantum state through a Gaussian transformation parametrized
+    by the three parameters gamma, phi and z, followed by a Kerr transformation parametrized by kappa.
+    This is a differentiable function that can be safely used in a TensorFlow computation.
+
+    Arguments:
+        gamma (complex): displacement parameter
+        phi (float): phase rotation
+        z (complex): squeezing parameter
+        kappa (float): Kerr parameter
+        state_in (complex array[D]): input state of dimension D
+    
+    Returns:
+        state_out (complex array[D]): output state of dimension D
+    """
+    gamma = tf.convert_to_tensor(gamma)
+    phi = tf.convert_to_tensor(phi)
+    z = tf.convert_to_tensor(z)
+    kappa = tf.convert_to_tensor(kappa)
+    state_in = tf.convert_to_tensor(state_in)
+    cutoff = state_in.shape[1]
+
+    dtype_c = state_in.dtype
+    dtype_r = phi.dtype
+    
+    R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
+    K = tf.exp(1j * tf.cast(kappa, dtype=dtype_c) * np.arange(cutoff)**2)
+    state_out = K*R[..., 0]
+
+    def grad(dy):
+        "Vector-Jacobian products for all the arguments (gamma, phi, z, kappa, Psi)"
+        G = tf.numpy_function(G_matrix, [gamma, phi, z, cutoff], dtype_c)
+        dPsi_dgamma, dPsi_dgammac, dPsi_dphi, dPsi_dz, dPsi_dzc = tf.numpy_function(
+            dPsi, [gamma, phi, z, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c)) 
+        
+        dPsi_dgamma  = K * dPsi_dgamma
+        dPsi_dgammac = K * dPsi_dgammac
+        dPsi_dphi    = K * dPsi_dphi
+        dPsi_dz      = K * dPsi_dz
+        dPsi_dzc     = K * dPsi_dzc
+        dPsi_dkappa  = 1j*np.arange(cutoff)**2 * state_out
+
+        grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
+        grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
+        grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
+        grad_kappa = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa)))
+        grad_Psic = tf.linalg.matvec(K[:,None]*G, dy, adjoint_a=True)
+        return grad_gammac, grad_phi, grad_zc, grad_kappa, grad_Psic
+
+    return state_out, grad
     
     
 @tf.custom_gradient

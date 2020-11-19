@@ -27,7 +27,7 @@ def convert_scalar(arr):
         return lambda arr: arr
 
 
-@njit  # (nb.types.Tuple((nb.complex128, nb.complex128[:], nb.complex128[:,:]))(nb.complex128, nb.float64, nb.complex128))
+@njit
 def C_mu_Sigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
     """
     Utility function to construct:
