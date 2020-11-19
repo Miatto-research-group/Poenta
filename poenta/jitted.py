@@ -519,12 +519,15 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
 
     R = np.zeros((cutoff, cutoff), dtype=dtype)
     G0 = np.zeros(cutoff, dtype=dtype)
+    
+    print("here inside R_matrix!!!!")
 
     # first row of Transformation matrix
     G0[0] = C
     for n in range(1, cutoff):
         G0[n] = mu[1] / sqrt[n] * G0[n - 1] - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2]
-
+    
+    print(G0)
     # first row of R matrix
     for n in range(cutoff):
         R[0, n] = np.dot(G0[: cutoff - n], old_state)
