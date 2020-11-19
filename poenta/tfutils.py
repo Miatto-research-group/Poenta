@@ -83,28 +83,32 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
 
     R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
     gaussian_output = R[..., 0]
-
-    state_out = KerrDiagonal(kappa, cutoff, dtype= dtype_c)[None, :] * gaussian_output
+    
+    Kerr_output = tf.exp(1j * tf.cast(kappa, dtype=dtype_c) * np.arange(cutoff) ** 2)
+    state_out = Kerr_output * gaussian_output
 
     def grad(dy):
-        "Vector-Jacobian products for all the arguments (gamma, phi, z, Psi)"
+        "Vector-Jacobian products for all the arguments (gamma, phi, z, kappa, Psi)"
         G = tf.numpy_function(G_matrix, [gamma, phi, z, cutoff], dtype_c)
-        dPsi_dgamma, dPsi_dgammac, dPsi_dphi, dPsi_dz, dPsi_dzc = tf.numpy_function(
+        dPsiG_dgamma, dPsiG_dgammac, dPsiG_dphi, dPsiG_dz, dPsiG_dzc = tf.numpy_function(
             dPsi, [gamma, phi, z, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c)
         )
-        
-        ##TODO: dPsi_dkappa
-        dPsi_dkappa = grad_KerrDiagonal(kappa, cutoff, dtype= dtype_c)[None, :] * gaussian_output
+        dPsi_dgamma = Kerr_output * dPsiG_dgamma
+        dPsi_dgammac = Kerr_output * dPsiG_dgammac
+        dPsi_dphi = Kerr_output * dPsiG_dphi
+        dPsi_dz = Kerr_output * dPsiG_dz
+        dPsi_dzc = Kerr_output * dPsiG_dzc
+        dPsi_dkappa = 1j * np.arange(cutoff) ** 2 * state_out
         
         ##TODO: G_C matrix
         
         grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
-        grad_k = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa)))
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
+        grad_k = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa)))
         
         
-        grad_Psic = tf.linalg.matvec(G, dy, adjoint_a=True) # mat-vec mult on last index of both
+        grad_Psic = tf.linalg.matvec(Kerr_output[None,:]*G, dy, adjoint_a=True) # mat-vec mult on last index of both
         return grad_gammac, grad_phi, grad_zc, grad_k, grad_Psic
 
     return state_out, grad
@@ -182,20 +186,16 @@ def LayerTransformation2mode(gamma1: tf.Variable, gamma2: tf.Variable, phi1: tf.
         return grad_gamma1c, grad_gamma2c, grad_phi1, grad_phi2, grad_theta1, grad_varphi1, grad_zeta1c, grad_zeta2c, grad_theta, grad_varphi, grad_Psic
     
     return state_out, grad
-
-def KerrDiagonal(k: tf.Variable, cutoff: int, dtype: tf.dtypes.DType):
-    """
-    Returns the diagonal of the single-mode Kerr matrix (vector)
-
-    Arguments:
-        cutoff (int): the cutoff dimension of Fock space
-        dtype (tf dtype): either tf.complex64 or tf.complex128
-    """
-    return tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff) ** 2)
-    
-def grad_KerrDiagonal(k: tf.Variable, cutoff: int, dtype: tf.dtypes.DType):
-
-    return 1j*np.arange(cutoff) ** 2*tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff) ** 2)
-
-
-    
+#
+#def KerrDiagonal(k: tf.Variable, cutoff: int, dtype: tf.dtypes.DType):
+#    """
+#    Returns the diagonal of the single-mode Kerr matrix (vector)
+#
+#    Arguments:
+#        cutoff (int): the cutoff dimension of Fock space
+#        dtype (tf dtype): either tf.complex64 or tf.complex128
+#    """
+#    return tf.exp(1j * tf.cast(k, dtype=dtype) * np.arange(cutoff) ** 2)
+#
+#
+#

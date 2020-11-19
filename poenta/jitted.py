@@ -527,7 +527,7 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
 
     # first row of R matrix
     for n in range(cutoff):
-        R[0, n] = np.dot(G0[: cutoff - n], old_state)
+        R[0, n] = np.dot(np.conj(G0[: cutoff - n]), old_state)
         old_state = old_state[1:] * sqrt[1 : cutoff - n]
 
     # rest of R matrix
@@ -605,7 +605,7 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
     for j in range(cutoff):
         G_00pq3 = G_00pq2
         for k in range(cutoff):
-            R[0,0,j,k] = np.sum(G_00pq3*old_state[j:,k:])
+            R[0,0,j,k] = np.sum(np.conj(G_00pq3)*old_state[j:,k:])
             G_00pq3 = G_00pq3[:,:-1]*sqrt[k+1:]
         G_00pq2 = sqrtT[j+1:]*G_00pq2[:-1,:]
 
