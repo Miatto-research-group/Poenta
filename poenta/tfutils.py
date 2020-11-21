@@ -83,8 +83,8 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
     R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
     gaussian_output = R[..., 0]
     
-    Kerr_output = tf.exp(1j * tf.cast(kappa, dtype=dtype_c) * np.arange(cutoff) ** 2)
-    state_out = Kerr_output * gaussian_output
+    Kerr = tf.exp(1j * tf.cast(kappa, dtype=dtype_c) * np.arange(cutoff) ** 2)
+    state_out = Kerr * gaussian_output
 
     def grad(dy):
         "Vector-Jacobian products for all the arguments (gamma, phi, z, kappa, Psi)"
@@ -92,14 +92,19 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
         dPsiG_dgamma, dPsiG_dgammac, dPsiG_dphi, dPsiG_dz, dPsiG_dzc = tf.numpy_function(
             dPsi, [gamma, phi, z, state_in, G[0], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c)
         )
-        dPsi_dgamma = Kerr_output * dPsiG_dgamma
-        dPsi_dgammac = Kerr_output * dPsiG_dgammac
-        dPsi_dphi = Kerr_output * dPsiG_dphi
-        dPsi_dz = Kerr_output * dPsiG_dz
-        dPsi_dzc = Kerr_output * dPsiG_dzc
+        #dPsi_dgamma (batch,D,5)
+        dPsi_dgamma = Kerr * dPsiG_dgamma
+        dPsi_dgammac = Kerr * dPsiG_dgammac
+        dPsi_dphi = Kerr * dPsiG_dphi
+        dPsi_dz = Kerr * dPsiG_dz
+        dPsi_dzc = Kerr * dPsiG_dzc
         dPsi_dkappa = 1j * np.arange(cutoff) ** 2 * state_out
         
-        ##TODO: G_C matrix
+        ##TODO: G_C matrix [D,D,batch,5]
+        ##(batch,5) for G[0,0]
+        ##dPsi_dgamma (batch,D,5)
+        ##state_out D
+        GeoTensor[0,0] = (tf.math.conj(dPsi_dgamma) * tf.expand_dims(dPsi_dgamma,0)).sum(axis = 1) - (tf.math.conj(dPsi_dgamma) * tf.expand_dims(state_out),0) * (tf.expand_dims(tf.math.conj(state_out),0) * dPsi_dgamma)
         
         grad_gammac = tf.reduce_sum(dy * tf.math.conj(dPsi_dgamma) + tf.math.conj(dy) * dPsi_dgammac)
         grad_phi = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dphi)))
@@ -107,7 +112,8 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
         grad_k = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa)))
         
         
-        grad_Psic = tf.linalg.matvec(Kerr_output[:,None]*G, dy, adjoint_a=True) # mat-vec mult on last index of both
+        grad_Psic = tf.linalg.matvec(Kerr[:,None]*G, dy, adjoint_a=True) # mat-vec mult on last index of both
+#        grad_Psic = tf.einsum("a,ab,ca->cb",  tf.math.conj(Kerr), tf.math.conj(G) , dy)
         return grad_gammac, grad_phi, grad_zc, grad_k, grad_Psic
 
     return state_out, grad
@@ -158,17 +164,37 @@ def LayerTransformation2mode(gamma1: tf.Variable, gamma2: tf.Variable, phi1: tf.
     
     R = tf.numpy_function(R_matrix2, [gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in], dtype_c)
     gaussian_output = R[:, :, :, 0, 0]
+    Kerr1 = tf.exp(1j * tf.cast(kappa1, dtype=dtype_c) * np.arange(cutoff) ** 2)
+    Kerr2 = tf.exp(1j * tf.cast(kappa2, dtype=dtype_c) * np.arange(cutoff) ** 2)
     
-    state_out = KerrDiagonal(kappa1, cutoff, dtype=dtype_c)[None, :] * gaussian_output * KerrDiagonal(kappa2, cutoff, dtype=dtype_c)
+    state_out = Kerr1[:,None] * gaussian_output * Kerr2[None,:]
 
     
     def grad(dy):
         "Vector-Jacobian products for all the arguments (gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in)"
         G = tf.numpy_function(G_matrix2, [gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, cutoff], dtype_c)
         
-        dPsi_dgamma1, dPsi_dgamma1c, dPsi_dgamma2, dPsi_dgamma2c, dPsi_dphi1, dPsi_dphi2, dPsi_dtheta1, dPsi_dvarphi1, dPsi_dzeta1, dPsi_dzeta1c, dPsi_dzeta2, dPsi_dzeta2c, dPsi_dtheta, dPsi_dvarphi = tf.numpy_function(dPsi2,[gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in, G[0,0,:,:], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c))
+        dPsiG_dgamma1, dPsiG_dgamma1c, dPsiG_dgamma2, dPsiG_dgamma2c, dPsiG_dphi1, dPsiG_dphi2, dPsiG_dtheta1, dPsiG_dvarphi1, dPsiG_dzeta1, dPsiG_dzeta1c, dPsiG_dzeta2, dPsiG_dzeta2c, dPsiG_dtheta, dPsiG_dvarphi = tf.numpy_function(dPsi2,[gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in, G[0,0,:,:], R], (dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c, dtype_c))
+        #dPsi_dgamma (batch,D,D,14)
+        dPsi_dgamma1 = Kerr1[:,None] * dPsiG_dgamma1 * Kerr2[None,:]
+        dPsi_dgamma1c = Kerr1[:,None] * dPsiG_dgamma1c * Kerr2[None,:]
+        dPsi_dgamma2 = Kerr1[:,None] * dPsiG_dgamma2 * Kerr2[None,:]
+        dPsi_dgamma2c = Kerr1[:,None] * dPsiG_dgamma2c * Kerr2[None,:]
+        dPsi_dphi1 = Kerr1[:,None] * dPsiG_dphi1 * Kerr2[None,:]
+        dPsi_dphi2 = Kerr1[:,None] * dPsiG_dphi2 * Kerr2[None,:]
+        dPsi_dtheta1 = Kerr1[:,None] * dPsiG_dtheta1 * Kerr2[None,:]
+        dPsi_dvarphi1 = Kerr1[:,None] * dPsiG_dvarphi1 * Kerr2[None,:]
+        dPsi_dzeta1 = Kerr1[:,None] * dPsiG_dzeta1 * Kerr2[None,:]
+        dPsi_dzeta1c = Kerr1[:,None] * dPsiG_dzeta1c * Kerr2[None,:]
+        dPsi_dzeta2 = Kerr1[:,None] * dPsiG_dzeta2 * Kerr2[None,:]
+        dPsi_dzeta2c = Kerr1[:,None] * dPsiG_dzeta2c * Kerr2[None,:]
+        dPsi_dtheta = Kerr1[:,None] * dPsiG_dtheta * Kerr2[None,:]
+        dPsi_dvarphi = Kerr1[:,None] * dPsiG_dvarphi * Kerr2[None,:]
         
-        ##TODO: with kappa1 and kappa2
+        dPsi_dkappa1 = (1j * np.arange(cutoff) ** 2)[:,None] * state_out
+        dPsi_dkappa2 =  state_out * (1j * np.arange(cutoff) ** 2)[None,:]
+        
+        ##TODO: G_C matrix
         
         grad_gamma1c = tf.reduce_sum(dy*tf.math.conj(dPsi_dgamma1) + tf.math.conj(dy)*dPsi_dgamma1c)
         grad_gamma2c = tf.reduce_sum(dy*tf.math.conj(dPsi_dgamma2) + tf.math.conj(dy)*dPsi_dgamma2c)
@@ -180,9 +206,13 @@ def LayerTransformation2mode(gamma1: tf.Variable, gamma2: tf.Variable, phi1: tf.
         grad_varphi1 = 2*tf.math.real(tf.reduce_sum(dy*tf.math.conj(dPsi_dvarphi1)))
         grad_theta = 2*tf.math.real(tf.reduce_sum(dy*tf.math.conj(dPsi_dtheta)))
         grad_varphi = 2*tf.math.real(tf.reduce_sum(dy*tf.math.conj(dPsi_dvarphi)))
-        grad_Psic = tf.einsum("abcd,eab->ecd",  tf.math.conj(G), dy)
         
-        return grad_gamma1c, grad_gamma2c, grad_phi1, grad_phi2, grad_theta1, grad_varphi1, grad_zeta1c, grad_zeta2c, grad_theta, grad_varphi, grad_Psic
+        grad_k1 = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa1)))
+        grad_k2 = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa2)))
+        
+        grad_Psic = tf.einsum("a,abcd,b,eab->ecd",  tf.math.conj(Kerr1), tf.math.conj(G) , tf.math.conj(Kerr2), dy)
+        
+        return grad_gamma1c, grad_gamma2c, grad_phi1, grad_phi2, grad_theta1, grad_varphi1, grad_zeta1c, grad_zeta2c, grad_theta, grad_varphi, grad_k1, grad_k2, grad_Psic
     
     return state_out, grad
 #
