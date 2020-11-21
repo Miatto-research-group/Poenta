@@ -16,8 +16,7 @@
 import tensorflow as tf
 import numpy as np
 
-from .jitted import G_matrix, G_matrix2
-from .experimental import dPsi, R_matrix, dPsi2, R_matrix2
+from .jitted import G_matrix, G_matrix2,dPsi, R_matrix, dPsi2, R_matrix2
 
 
 def complex_initializer(dtype):
@@ -108,7 +107,7 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
         grad_k = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa)))
         
         
-        grad_Psic = tf.linalg.matvec(Kerr_output*G, dy, adjoint_a=True) # mat-vec mult on last index of both
+        grad_Psic = tf.linalg.matvec(Kerr_output[:,None]*G, dy, adjoint_a=True) # mat-vec mult on last index of both
         return grad_gammac, grad_phi, grad_zc, grad_k, grad_Psic
 
     return state_out, grad
