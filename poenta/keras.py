@@ -26,6 +26,7 @@ class QuantumLayer(tf.keras.layers.Layer):
         self.cutoff = cutoff
         self.realtype = realtype
         self.complextype = complextype
+        self.nat_grad = False
 
     def build(self, input_shape):  # TODO: upgrade for 2 modes
         if self.num_modes == 1:

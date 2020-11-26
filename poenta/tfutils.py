@@ -16,7 +16,7 @@
 import tensorflow as tf
 import numpy as np
 
-from .jitted import G_matrix, G_matrix2
+from .jitted import G_matrix, G_matrix2, inverse_metric
 from .experimental import dPsi, R_matrix, dPsi2, R_matrix2
 
 
@@ -128,6 +128,7 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
     R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
     K = tf.exp(1j * tf.cast(kappa, dtype=dtype_c) * np.arange(cutoff)**2)
     state_out = K*R[..., 0]
+    
 
     def grad(dy):
         "Vector-Jacobian products for all the arguments (gamma, phi, z, kappa, Psi)"
@@ -147,6 +148,18 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
         grad_kappa = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa)))
         grad_Psic = tf.linalg.matvec(K[:,None]*G, dy, adjoint_a=True)
+
+        c = 0.5
+        dPsi_dtheta = tf.convert_to_tensor([dPsi_dgamma[0], dPsi_dgammac[0], dPsi_dz[0], dPsi_dzc[0], c*dPsi_dphi[0], c*dPsi_dphi[0], c*dPsi_dkappa[0], c*dPsi_dkappa[0]])
+        dPsi_dthetac = tf.convert_to_tensor([dPsi_dgammac[0], dPsi_dgamma[0], dPsi_dzc[0], dPsi_dz[0], c*dPsi_dphi[0], c*dPsi_dphi[0], c*dPsi_dkappa[0], c*dPsi_dkappa[0]])
+        # dPsi_dthetaReal = tf.convert_to_tensor([dPsi_dgamma[0]+dPsi_dgammac[0], 1j*dPsi_dgammac[0] - 1j*dPsi_dgammac[0], dPsi_dz[0]+dPsi_dzc[0], 1j*dPsi_dz[0] - 1j*dPsi_dzc[0], c*dPsi_dphi[0], c*dPsi_dphi[0], c*dPsi_dkappa[0], c*dPsi_dkappa[0]])
+
+
+        invMetric = tf.numpy_function(inverse_metric, [dPsi_dtheta, dPsi_dthetac, state_out[0]], dtype_c)
+        updates = tf.convert_to_tensor([tf.math.conj(grad_gammac), grad_gammac, tf.math.conj(grad_zc), grad_zc, tf.cast(grad_phi, dtype_c), tf.cast(grad_phi, dtype_c), tf.cast(grad_kappa, dtype_c), tf.cast(grad_kappa, dtype_c)], dtype=dtype_c)
+        NG_updates = tf.linalg.matvec(invMetric, updates)
+        grad_gammac, grad_zc, grad_phi, grad_kappa = NG_updates[1], NG_updates[3], tf.math.real(NG_updates[4]), tf.math.real(NG_updates[5])
+
         return grad_gammac, grad_phi, grad_zc, grad_kappa, grad_Psic
 
     return state_out, grad

@@ -733,7 +733,13 @@ def G_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
                     
     return G
 
-
+#@njit
+def inverse_metric(dpsi_dtheta, dpsi_dthetac, psi):
+    GC = np.real(np.einsum('ap,bp', np.conj(dpsi_dtheta), dpsi_dtheta) - np.einsum('ap,p,q,bq',np.conj(dpsi_dtheta), psi, np.conj(psi), dpsi_dtheta))
+    GCT = np.einsum('ap,bp', dpsi_dthetac, np.conj(dpsi_dthetac)) - np.einsum('ap,p,q,bq', dpsi_dthetac, np.conj(psi), psi, np.conj(dpsi_dthetac))
+    inverse = np.linalg.pinv((GC+GCT)/2).astype(psi.dtype)
+    print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
+    return inverse #np.diag(np.diag(inverse))
 
 # Extras
 @njit
