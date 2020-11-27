@@ -180,4 +180,6 @@ class LossHistoryCallback(tf.keras.callbacks.Callback):
     def on_train_batch_end(self, batch, logs=None):
         self.losses.append(self.model._loss)
 
+    def plot_params(self, complex=True, real=True, ):
+
 

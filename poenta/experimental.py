@@ -19,7 +19,7 @@ from numba import njit
 from .jitted import C_mu_Sigma, dC_dmu_dSigma, convert_scalar, C_mu_Sigma2, dC_dmu_dSigma2
 
 
-@njit()
+@njit
 def R_matrix(gamma, phi, z, old_state):
     """
     Directly constructs the transformed state recursively and exactly.
@@ -69,7 +69,7 @@ def R_matrix(gamma, phi, z, old_state):
 
     return R
     
-@njit()
+@njit
 def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, old_state):
     """
     Directly constructs the transformed state recursively and exactly.
@@ -155,8 +155,8 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
     return R
 
 
-@njit()
-def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0: np.array, R: np.array) -> list:
+@njit
+def dPsi(gamma: np.complex, phi: np.float, z: np.complex, kappa: np.float, state_in: np.array, G0: np.array, R: np.array) -> list:
 
     batch, cutoff = state_in.shape
     dtype = state_in.dtype
@@ -205,9 +205,13 @@ def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0
             - Sigma[0, 0] * sqrt[m - 1] * dR[:, m - 2, :-m]
             - Sigma[0, 1] * dR[:, m - 1, 1 : -m + 1]
         ) / sqrt[m]
-    return list(np.transpose(dR[:, :, 0], (2, 0, 1)))
 
-@njit()
+    K = np.exp(1j * kappa * np.arange(cutoff)**2)
+    dpsi = K*np.transpose(dR[:, :, 0], (2, 0, 1))
+    
+    return list(dpsi)
+
+@njit
 def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in, G00, R):
     """
     Computes the gradient of the new state with respect to
