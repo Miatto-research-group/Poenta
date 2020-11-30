@@ -14,10 +14,12 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import tensorflow as tf
-from .tfutils import real_complex_types, complex_initializer, real_initializer, LayerTransformation, KerrDiagonal, GaussianTransformation2mode
-from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from numpy import pi, cos, tanh
-
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import defaultdict
+from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
+from .tfutils import real_complex_types, complex_initializer, real_initializer, LayerTransformation, KerrDiagonal, GaussianTransformation2mode
 
 class QuantumLayer(tf.keras.layers.Layer):
     def __init__(self, num_modes: int, cutoff: int, realtype: tf.dtypes.DType, complextype: tf.dtypes.DType):
@@ -79,11 +81,11 @@ class QuantumLayer(tf.keras.layers.Layer):
             self.kappa2 = self.add_weight(
                 "kappa2", dtype=self.realtype, trainable=True, initializer=real_initializer(self.realtype)
             )
-        super().build(input_shape)  # is this necessary?
+        super().build(input_shape)
 
     def call(self, input):
         if self.num_modes == 1:
-            output = LayerTransformation(self.gamma, self.phi, self.zeta, self.kappa, input)
+            output = LayerTransformation(self.gamma, self.phi, self.zeta, self.kappa, input, self.nat_grad)
         elif self.num_modes == 2:
             gaussian_output = GaussianTransformation2mode(self.gamma1, self.gamma2, self.phi1, self.phi2, self.theta1, self.varphi1, self.zeta1, self.zeta2, self.theta, self.varphi, input)
             output = KerrDiagonal(self.kappa1, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output * KerrDiagonal(self.kappa2, self.cutoff, dtype=self.complextype)
@@ -108,6 +110,9 @@ class QuantumCircuit(tf.keras.Sequential):
                 [tf.keras.Input(shape=(cutoff,cutoff,), batch_size=batch_size, dtype=dtype)]
                 + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
             )
+
+    def loss_fn(self, targets, states_out):
+        return 1 - tf.abs(tf.reduce_sum(states_out * tf.math.conj(targets))/targets.shape[0]) ** 2
 
 
 class LossCallback(tf.keras.callbacks.Callback):
@@ -172,14 +177,61 @@ class LearningRateScheduler(tf.keras.callbacks.Callback):
         tf.keras.backend.set_value(self.model.optimizer.lr, new_lr)
 
 
-class LossHistoryCallback(tf.keras.callbacks.Callback):
+class HistoryCallback(tf.keras.callbacks.Callback):
     def __init__(self):
         super().__init__()
-        self.losses= []
+        self.losses = []
+        self.variables = defaultdict(list)
 
     def on_train_batch_end(self, batch, logs=None):
         self.losses.append(self.model._loss)
 
-    def plot_params(self, complex=True, real=True, ):
+        values = defaultdict(list)
+        for var in self.model.variables:
+            s = var.name
+            s = s[s.find('/')+1:-2]
+            values[s].append(var.numpy())
+        
+        for p in values:
+            self.variables[p].append(values[p])
+
+
+    def plot_complex(self):
+        gamma = np.array(self.variables['gamma']).T
+        zeta = np.array(self.variables['zeta']).T
+
+        fig, ax = plt.subplots(1,2, figsize=(10,10))
+        ax[0].set_aspect('equal')
+        ax[1].set_aspect('equal')
+
+        xlim_gamma, ylim_gamma = 1.1*np.max(np.abs(np.real(gamma))), 1.1*np.max(np.abs(np.imag(gamma)))
+        xlim_zeta, ylim_zeta   = 1.1*np.max(np.abs(np.real(zeta))),  1.1*np.max(np.abs(np.imag(zeta)))
+
+        ax[0].set_xlim(-xlim_gamma, xlim_gamma)
+        ax[0].set_ylim(-ylim_gamma, ylim_gamma)
+        ax[0].grid()
+        ax[1].set_xlim(-xlim_zeta, xlim_zeta)
+        ax[1].set_ylim(-ylim_zeta, ylim_zeta)
+        ax[1].grid()
+
+        for v in gamma:
+            ax[0].plot(np.real(v), np.imag(v))
+        for v in zeta:
+            ax[1].plot(np.real(v), np.imag(v))
+        
+    def plot_real(self):
+        phi = np.array(self.variables['phi']).T
+        kappa = np.array(self.variables['kappa']).T
+        fig, ax = plt.subplots(1,2,figsize=(7,5))
+        ax[0].grid()
+        ax[1].grid()
+
+        for v in phi:
+            ax[0].plot(v)
+        for v in kappa:
+            ax[1].plot(v)
+        
+        
+        
 
 

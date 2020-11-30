@@ -21,7 +21,7 @@ from typing import Callable, Union, Iterable
 from collections import ChainMap
 import rich
 
-from .keras import QuantumCircuit, LossCallback, LearningRateScheduler, ProgressBarCallback, LossHistoryCallback
+from .keras import QuantumCircuit, LossCallback, LearningRateScheduler, ProgressBarCallback, HistoryCallback
 
 
 class Circuit:
@@ -31,7 +31,7 @@ class Circuit:
         self.dtype = dtype
 
         self._model: QuantumCircuit
-        self._historycallback: LossHistoryCallback
+        self._historycallback: HistoryCallback
         self._inout_pairs: tuple
         self._cumul_steps: int = 0
 
@@ -86,16 +86,19 @@ class Circuit:
 
     def optimize(
         self,
-        loss_fn: Callable,
         steps: int,
         optimizer: Union[str, tf.optimizers.Optimizer] = "Adam",
         learning_rate: float = 0.001,
-        scheduler:bool = True
-    ) -> LossHistoryCallback:
+        scheduler:bool = True,
+        nat_grad:bool = False
+    ) -> HistoryCallback:
 
         if self._should_compile(optimizer, learning_rate):
-            self._model.compile(optimizer=self._validate_optimizer(optimizer, learning_rate), loss=loss_fn, metrics=[])
-            self._historycallback = LossHistoryCallback()
+            self._model.compile(optimizer=self._validate_optimizer(optimizer, learning_rate), loss=self._model.loss_fn, metrics=[])
+            self._historycallback = HistoryCallback()
+        
+        for l in self._model.layers:
+            l.nat_grad = nat_grad
 
         # Prepare input dataset
         def data():
@@ -170,5 +173,5 @@ class Circuit:
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     def __repr__(self):
-        circuit._model.summary(line_length=80, print_fn = rich.print)
+        self._model.summary(line_length=80, print_fn = rich.print)
         return ''
