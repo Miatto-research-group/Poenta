@@ -89,7 +89,7 @@ class Circuit:
         self,
         loss_fn: Callable,
         steps: int,
-        optimizer: Union[str, tf.optimizers.Optimizer] = "SGD",
+        optimizer: Union[str, tf.optimizers.Optimizer] = "Adam",
         learning_rate: float = 0.001,
         scheduler:bool = True
     ) -> LossHistoryCallback:

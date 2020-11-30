@@ -28,19 +28,23 @@ def convert_scalar(arr):
         return lambda arr: arr
         
 #@njit
-def inverse_metric(dpsi_dtheta, dpsi_dthetac, psi):
-    GC = np.real(np.einsum('ap,bp', np.conj(dpsi_dtheta), dpsi_dtheta) - np.einsum('ap,p,q,bq',np.conj(dpsi_dtheta), psi, np.conj(psi), dpsi_dtheta))
-    GCT = np.einsum('ap,bp', dpsi_dthetac, np.conj(dpsi_dthetac)) - np.einsum('ap,p,q,bq', dpsi_dthetac, np.conj(psi), psi, np.conj(dpsi_dthetac))
-    inverse = np.linalg.pinv((GC+GCT)/2).astype(psi.dtype)
-    print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
-    return inverse #np.diag(np.diag(inverse))
+def inverse_metric(dpsi_dtheta, dpsi_dthetac, psi, diagonal=False):
+    vec = np.dot(dpsi_dtheta, np.conj(psi))
+    vecc = np.dot(dpsi_dthetac, np.conj(psi))
+    GC = np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec)
+    GCT = np.dot(dpsi_dthetac, np.conj(dpsi_dthetac).T) - np.outer(vecc, np.conj(vec))
+    mat = (GC+GCT)/2 + 0.1*np.identity(len(GC))
+    inverse = np.linalg.solve(mat, np.identity(len(mat)).astype(psi.dtype)).astype(psi.dtype)
+    # print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
+    return inverse#np.diag(np.diag(inverse))
 
 #@njit
 def inverse_metric_real(dpsi_dtheta, psi):
-    G = np.real(np.einsum('ap,bp', np.conj(dpsi_dtheta), dpsi_dtheta) - np.einsum('ap,p,q,bq',np.conj(dpsi_dtheta), psi, np.conj(psi), dpsi_dtheta))
-    inverse = np.linalg.pinv(G).astype(psi.dtype)
-    print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
-    return inverse #np.diag(np.diag(inverse))
+    vec = np.dot(dpsi_dtheta, np.conj(psi))
+    G = np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec)
+    mat = G + 0.1*np.identity(len(G))
+    inverse = np.linalg.solve(mat, np.identity(len(mat)).astype(psi.dtype)).astype(psi.dtype)
+    return inverse
 
 @njit  # (nb.types.Tuple((nb.complex128, nb.complex128[:], nb.complex128[:,:]))(nb.complex128, nb.float64, nb.complex128))
 def C_mu_Sigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
