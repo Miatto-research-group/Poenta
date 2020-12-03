@@ -87,16 +87,19 @@ class Circuit:
 
     def optimize(
         self,
-        loss_fn: Callable,
         steps: int,
-        optimizer: Union[str, tf.optimizers.Optimizer] = "SGD",
+        optimizer: Union[str, tf.optimizers.Optimizer] = "Adam",
         learning_rate: float = 0.001,
-        scheduler:bool = False
+        scheduler:bool = True,
+        nat_grad:bool = False
     ) -> LossHistoryCallback:
 
         if self._should_compile(optimizer, learning_rate):
-            self._model.compile(optimizer=self._validate_optimizer(optimizer, learning_rate), loss=loss_fn, metrics=[])
+            self._model.compile(optimizer=self._validate_optimizer(optimizer, learning_rate), loss=self._model.loss_fn, metrics=[])
             self._historycallback = LossHistoryCallback()
+            
+        for l in self._model.layers:
+            l.nat_grad = nat_grad
 
         # Prepare input dataset
         def data():

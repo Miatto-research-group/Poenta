@@ -41,10 +41,17 @@ def inverse_metric(dpsi_dtheta, dpsi_dthetac, psi, diagonal=False):
 #@njit
 def inverse_metric_real(dpsi_dtheta, psi):
     vec = np.dot(dpsi_dtheta, np.conj(psi))
-    G = np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec)
+    #######Real G##############
+    G = np.real(np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec))
+#    G = np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec)
+    ######Diag or NOT##########
+#    G = np.diag(np.diagonal(G))
+    ###########################
     mat = G + 0.1*np.identity(len(G))
     inverse = np.linalg.solve(mat, np.identity(len(mat)).astype(psi.dtype)).astype(psi.dtype)
     return inverse
+    
+
 
 @njit  # (nb.types.Tuple((nb.complex128, nb.complex128[:], nb.complex128[:,:]))(nb.complex128, nb.float64, nb.complex128))
 def C_mu_Sigma(gamma: np.complex, phi: np.float, z: np.complex) -> tuple:
