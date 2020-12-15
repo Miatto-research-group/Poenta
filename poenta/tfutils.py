@@ -117,52 +117,55 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
         grad_zc = tf.reduce_sum(dy * tf.math.conj(dPsi_dz) + tf.math.conj(dy) * dPsi_dzc)
         grad_kappa = 2 * tf.math.real(tf.reduce_sum(dy * tf.math.conj(dPsi_dkappa)))
         
+        grad_gamma = tf.reduce_sum(dy * tf.math.conj(dPsi_dgammac) + tf.math.conj(dy) * dPsi_dgamma)
+        grad_z = tf.reduce_sum(dy * tf.math.conj(dPsi_dzc) + tf.math.conj(dy) * dPsi_dz)
         
         grad_Psic = tf.linalg.matvec(Kerr[:,None]*G, dy, adjoint_a=True)
         
         
         ##TODO: G_C matrix [D,D,batch,5] if batch = 0
         
-        #########COMPLEX############
+#        ########COMPLEX############
 #        if nat_grad:
-#            c = 1.0
+#            c = 1
 #            dPsi_dtheta = tf.convert_to_tensor([dPsi_dgamma[0], dPsi_dgammac[0], dPsi_dz[0], dPsi_dzc[0], c*dPsi_dphi[0], c*dPsi_dkappa[0]])
 #            dPsi_dthetac = tf.convert_to_tensor([dPsi_dgammac[0], dPsi_dgamma[0], dPsi_dzc[0], dPsi_dz[0], c*dPsi_dphi[0], c*dPsi_dkappa[0]])
 #
-##            invMetric = tf.numpy_function(inverse_metric, [dPsi_dtheta, dPsi_dthetac, state_out[0]], dtype_c)
-#            invMetric = tf.numpy_function(inverse_metric_real, [dPsi_dtheta, state_out[0]], dtype_c)
+#            invMetric = tf.numpy_function(inverse_metric, [dPsi_dtheta, dPsi_dthetac, state_out[0]], dtype_c)
 #
-#            updates = tf.convert_to_tensor([tf.math.conj(grad_gammac), grad_gammac, tf.math.conj(grad_zc), grad_zc, tf.cast(grad_phi, dtype_c), tf.cast(grad_kappa, dtype_c)], dtype=dtype_c)
+#            updates = tf.convert_to_tensor([grad_gammac, tf.math.conj(grad_gammac), grad_zc, tf.math.conj(grad_zc),  tf.cast(grad_phi, dtype_c), tf.cast(grad_kappa, dtype_c)], dtype=dtype_c)
+#
+##            updates = tf.convert_to_tensor([tf.math.conj(grad_gammac), grad_gammac, tf.math.conj(grad_zc), grad_zc, tf.cast(grad_phi, dtype_c), tf.cast(grad_kappa, dtype_c)], dtype=dtype_c)
+#
 #            NG_updates = tf.linalg.matvec(invMetric, updates)
-#            grad_gammac, grad_zc, grad_phi, grad_kappa = NG_updates[1], NG_updates[3], tf.math.real(NG_updates[4]), tf.math.real(NG_updates[5])
-        #############################
-    
+#            grad_gammac, grad_zc, grad_phi, grad_kappa = NG_updates[0], NG_updates[2], tf.math.real(NG_updates[4]), tf.math.real(NG_updates[5])
+#        ############################
+
 
 
         ##########REAL###########
         if nat_grad:
-            dPsi_dgammac_real = dPsi_dgamma[0]+dPsi_dgammac[0]
-            dPsi_dgammac_imag = -1j*dPsi_dgamma[0] + 1j*dPsi_dgammac[0]
+            dPsi_dgamma_real = dPsi_dgamma[0]+dPsi_dgammac[0]
+            dPsi_dgamma_imag = 1j*dPsi_dgamma[0] - 1j*dPsi_dgammac[0]
 
-            dPsi_dzetac_real = dPsi_dz[0]+dPsi_dzc[0]
-            dPsi_dzetac_imag = -1j*dPsi_dz[0] + 1j*dPsi_dzc[0]
+            dPsi_dzeta_real = dPsi_dz[0]+dPsi_dzc[0]
+            dPsi_dzeta_imag = 1j*dPsi_dz[0] - 1j*dPsi_dzc[0]
 
             dPsi_dphi_real = dPsi_dphi[0]
             dPsi_dkappa_real = dPsi_dkappa[0]
 
-            dPsi_dthetaReal = tf.convert_to_tensor([dPsi_dgammac_real, dPsi_dgammac_imag, dPsi_dzetac_real, dPsi_dzetac_imag, dPsi_dphi_real,  dPsi_dkappa_real])
-
+            dPsi_dthetaReal = tf.convert_to_tensor([dPsi_dgamma_real, dPsi_dgamma_imag, dPsi_dzeta_real, dPsi_dzeta_imag, dPsi_dphi_real,  dPsi_dkappa_real])
 
             invMetric = tf.numpy_function(inverse_metric_real, [dPsi_dthetaReal, state_out[0]], dtype_c)
 
-            grad_gammac_real = tf.math.real(grad_gammac)
-            grad_gammac_imag = tf.math.imag(grad_gammac)
-            grad_zc_real = tf.math.real(grad_zc)
-            grad_zc_imag = tf.math.imag(grad_zc)
-            grad_phi_real = grad_phi
-            grad_kappa_real = grad_kappa
+            grad_gamma_real = tf.cast(grad_gamma + grad_gammac,dtype = dtype_c)
+            grad_gamma_imag = 1j*tf.cast(grad_gamma - grad_gammac,dtype = dtype_c)
+            grad_z_real = tf.cast(grad_z + grad_zc,dtype = dtype_c)
+            grad_z_imag = 1j*tf.cast(grad_z - grad_zc,dtype=dtype_c)
+            grad_phi_real = tf.cast(grad_phi,dtype = dtype_c)
+            grad_kappa_real = tf.cast(grad_kappa,dtype = dtype_c)
 
-            updates = tf.convert_to_tensor([grad_gammac_real, grad_gammac_imag, grad_zc_real, grad_zc_imag, grad_phi_real, grad_kappa_real], dtype=dtype_c)
+            updates = tf.convert_to_tensor([grad_gamma_real, grad_gamma_imag, grad_z_real, grad_z_imag, grad_phi_real, grad_kappa_real], dtype=dtype_c)
             NG_updates = tf.linalg.matvec(invMetric, updates)
             grad_gammac, grad_zc, grad_phi, grad_kappa = NG_updates[0]+1j*NG_updates[1], NG_updates[2]+1j*NG_updates[3], tf.math.real(NG_updates[4]), tf.math.real(NG_updates[5])
 

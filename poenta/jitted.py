@@ -32,24 +32,23 @@ def inverse_metric(dpsi_dtheta, dpsi_dthetac, psi, diagonal=False):
     vec = np.dot(dpsi_dtheta, np.conj(psi))
     vecc = np.dot(dpsi_dthetac, np.conj(psi))
     GC = np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec)
-#    GCT = np.dot(dpsi_dthetac, np.conj(dpsi_dthetac).T) - np.outer(vecc, np.conj(vec))
-    GCT = np.dot(dpsi_dthetac, np.conj(dpsi_dthetac).T) - np.outer(np.conj(vec), vec)
-    mat = (GC+GCT)/2 + 0.1*np.identity(len(GC))
+    GCT = np.dot(dpsi_dthetac, np.conj(dpsi_dthetac).T) - np.outer(vecc, np.conj(vecc))
+    mat = (GC+GCT)/2 + 0.004*np.identity(len(GC))
     inverse = np.linalg.solve(mat, np.identity(len(mat)).astype(psi.dtype)).astype(psi.dtype)
-    # print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
+    print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
     return inverse#np.diag(np.diag(inverse))
 
 #@njit
 def inverse_metric_real(dpsi_dtheta, psi):
     vec = np.dot(dpsi_dtheta, np.conj(psi))
     #######Real G##############
-#    G = np.real(np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec))
-    G = np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec)
+    G = np.real(np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec))
     ######Diag or NOT##########
 #    G = np.diag(np.diagonal(G))
     ###########################
-    mat = G + 0.1*np.identity(len(G))
+    mat = G + 0.004*np.identity(len(G))
     inverse = np.linalg.solve(mat, np.identity(len(mat)).astype(psi.dtype)).astype(psi.dtype)
+    print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
     return inverse
     
 
