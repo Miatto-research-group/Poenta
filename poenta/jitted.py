@@ -735,6 +735,11 @@ def G_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
 
 @njit
 def inverse_metric(dpsi_dtheta, dpsi_dthetac, psi, diagonal=False):
+    # vec = np.dot(dpsi_dtheta, np.conj(psi))
+    # G = np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec)
+    # mat = G + 0.1*np.identity(len(G))
+    # inverse = np.linalg.solve(mat, np.identity(len(mat)).astype(psi.dtype)).astype(psi.dtype)
+
     vec = np.dot(dpsi_dtheta, np.conj(psi))
     vecc = np.dot(dpsi_dthetac, np.conj(psi))
     GC = np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec)
