@@ -14,8 +14,7 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import tensorflow as tf
-from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal, GaussianTransformation2mode
-from .tfutils import real_complex_types, complex_initializer, real_initializer, GaussianTransformation, KerrDiagonal
+from .tfutils import real_complex_types, complex_initializer, real_initializer, LayerTransformation, LayerTransformation2mode
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from numpy import pi, cos, tanh
 
@@ -27,6 +26,7 @@ class QuantumLayer(tf.keras.layers.Layer):
         self.cutoff = cutoff
         self.realtype = realtype
         self.complextype = complextype
+        self.nat_grad = False
 
     def build(self, input_shape):  # TODO: upgrade for 2 modes
         if self.num_modes == 1:
@@ -83,11 +83,10 @@ class QuantumLayer(tf.keras.layers.Layer):
 
     def call(self, input):
         if self.num_modes == 1:
-            gaussian_output = GaussianTransformation(self.gamma, self.phi, self.zeta, input)
-            output = KerrDiagonal(self.kappa, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output
+            output = LayerTransformation(self.gamma, self.phi, self.zeta, self.kappa, input, self.nat_grad)
+
         elif self.num_modes == 2:
-            gaussian_output = GaussianTransformation2mode(self.gamma1, self.gamma2, self.phi1, self.phi2, self.theta1, self.varphi1, self.zeta1, self.zeta2, self.theta, self.varphi, input)
-            output = KerrDiagonal(self.kappa1, self.cutoff, dtype=self.complextype)[None, :] * gaussian_output * KerrDiagonal(self.kappa2, self.cutoff, dtype=self.complextype)
+            output = LayerTransformation2mode(self.gamma1, self.gamma2, self.phi1, self.phi2, self.theta1, self.varphi1, self.zeta1, self.zeta2, self.theta, self.varphi, self.kappa1, self.kappa2, input)
         output.set_shape(input.get_shape())
         return output
 
@@ -110,6 +109,8 @@ class QuantumCircuit(tf.keras.Sequential):
                 + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
             )
 
+    def loss_fn(self, targets, states_out):
+        return 1 - tf.abs(tf.reduce_sum(states_out * tf.math.conj(targets))/targets.shape[0]) ** 2
 
 class LossCallback(tf.keras.callbacks.Callback):
     """

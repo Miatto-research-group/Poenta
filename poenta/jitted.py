@@ -14,6 +14,7 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+from numpy import expand_dims as ed
 from numba import njit
 import numba as nb
 
@@ -25,6 +26,31 @@ def convert_scalar(arr):
         return lambda arr: arr[()]
     else:
         return lambda arr: arr
+        
+#@njit
+def inverse_metric(dpsi_dtheta, dpsi_dthetac, psi, diagonal=False):
+    vec = np.dot(dpsi_dtheta, np.conj(psi))
+    vecc = np.dot(dpsi_dthetac, np.conj(psi))
+    GC = np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec)
+    GCT = np.dot(dpsi_dthetac, np.conj(dpsi_dthetac).T) - np.outer(vecc, np.conj(vecc))
+    mat = (GC+GCT)/2 + 0.001*np.identity(len(GC))
+    inverse = np.linalg.solve(mat, np.identity(len(mat)).astype(psi.dtype)).astype(psi.dtype)
+#    print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
+    return inverse#np.diag(np.diag(inverse))
+
+#@njit
+#def inverse_metric_real(dpsi_dtheta, psi):
+#    vec = np.dot(dpsi_dtheta, np.conj(psi))
+#    #######Real G##############
+#    G = np.real(np.dot(np.conj(dpsi_dtheta), dpsi_dtheta.T) - np.outer(np.conj(vec), vec))
+#    ######Diag or NOT##########
+##    G = np.diag(np.diagonal(G))
+#    ###########################
+#    mat = G + 0.004*np.identity(len(G))
+#    inverse = np.linalg.solve(mat, np.identity(len(mat)).astype(psi.dtype)).astype(psi.dtype)
+#    print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
+#    return inverse
+    
 
 
 @njit  # (nb.types.Tuple((nb.complex128, nb.complex128[:], nb.complex128[:,:]))(nb.complex128, nb.float64, nb.complex128))
@@ -491,9 +517,8 @@ def dC_dmu_dSigma2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, th
 
     return dC, dmu, dSigma
 
-
-@njit
-def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_state: np.array) -> np.array:
+@njit()
+def R_matrix(gamma, phi, z, old_state):
     """
     Directly constructs the transformed state recursively and exactly.
 
@@ -501,23 +526,22 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
         gamma (complex): displacement parameter
         phi (float): phase rotation parameter
         z (complex): squeezing parameter
-        old_state (complex array[D]): State to be transformed
+        old_state (complex array[batch, D]): State to be transformed
 
     Returns:
-        R (complex array[D,D]): the matrix whose 1st column is the transformed state
+        R (complex array[batch,D,D]): the matrix whose 1st column is the transformed state
     """
+    batch, cutoff = old_state.shape
+    dtype = old_state.dtype
+
     z = convert_scalar(z)
     phi = convert_scalar(phi)
     gamma = convert_scalar(gamma)
-    cutoff = convert_scalar(cutoff)
 
-    dtype = old_state.dtype
-    # print(dtype)
     C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
 
     sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
-
-    R = np.zeros((cutoff, cutoff), dtype=dtype)
+    R = np.zeros((batch, cutoff, cutoff), dtype=dtype)
     G0 = np.zeros(cutoff, dtype=dtype)
 
     # first row of Transformation matrix
@@ -527,21 +551,23 @@ def R_matrix(gamma: np.complex, phi: np.float, z: np.complex, cutoff: int, old_s
 
     # first row of R matrix
     for n in range(cutoff):
-        R[0, n] = np.dot(G0[: cutoff - n], old_state)
-        old_state = old_state[1:] * sqrt[1 : cutoff - n]
+        R[:, 0, n] = np.sum(old_state * G0[: cutoff - n], axis=-1)
+        old_state = old_state[:, 1:] * sqrt[1 : cutoff - n]
 
+    # second row of R matrix
+    R[:, 1, :-1] = mu[0] * R[:, 0, :-1] - Sigma[0, 1] * R[:, 0, 1:]
+        
     # rest of R matrix
-    for m in range(1, cutoff):
-        for n in range(cutoff - m):
-            R[m, n] = (
-                mu[0] / sqrt[m] * R[m - 1, n]
-                - Sigma[0, 0] * sqrt[m - 1] / sqrt[m] * R[m - 2, n]
-                - Sigma[0, 1] / sqrt[m] * R[m - 1, n + 1]
-            )
+    for m in range(2, cutoff):
+        R[:, m, :-m] = (
+            mu[0] * R[:, m - 1, :-m]
+            - Sigma[0, 0] * sqrt[m - 1] * R[:, m - 2, :-m]
+            - Sigma[0, 1] * R[:, m - 1, 1 : -m + 1]
+        ) / sqrt[m]
 
     return R
-
-@njit
+    
+@njit()
 def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, old_state):
     """
     Directly constructs the transformed state recursively and exactly.
@@ -561,11 +587,14 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
         theta(float): transmissivity angle of the beamsplitter
         varphi(float): reflection phase of the beamsplitter
         
-        old_state(np.array(complex)): State to be transformed
+        old_state(array([batch,D,D])): State to be transformed
 
     Returns:
-        R (complex array[D,D,D,D]): the matrix where R[:,:,0,0] is the transformed state
+        R (complex array[batch,D,D,D,D]): the matrix where R[batch,:,:,0,0] is the transformed state for each batch
     """
+    batch, cutoff, _ = old_state.shape
+    dtype = old_state.dtype
+    
     gamma1 = convert_scalar(gamma1)
     gamma2 = convert_scalar(gamma2)
     phi1 = convert_scalar(phi1)
@@ -579,14 +608,10 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
     
     C, mu ,Sigma = C_mu_Sigma2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi)
 
-    cutoff = old_state.shape[0]
-    dtype = old_state.dtype
-
     sqrt = np.sqrt(np.arange(cutoff, dtype = dtype))
     sqrtT = sqrt.reshape(-1, 1)
 
-
-    R = np.zeros((cutoff, cutoff, cutoff+1, cutoff+1), dtype = dtype)
+    R = np.zeros((batch, cutoff, cutoff, cutoff+1, cutoff+1), dtype = dtype)
     G_00pq = np.zeros((cutoff, cutoff), dtype = dtype)
     
     
@@ -599,13 +624,13 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
     for p in range(1,cutoff):
         for q in range(0,cutoff):
             G_00pq[p,q] = (mu[2]*G_00pq[p-1,q] - Sigma[2,2]*sqrt[p-1]*G_00pq[p-2,q] - Sigma[2,3]*sqrt[q]*G_00pq[p-1,q-1])/sqrt[p]
-                    
+                
     # R_00^jk = a_dagger^j \G_00pq> b^k  * |old_state>
     G_00pq2 = G_00pq
     for j in range(cutoff):
         G_00pq3 = G_00pq2
         for k in range(cutoff):
-            R[0,0,j,k] = np.sum(G_00pq3*old_state[j:,k:])
+            R[:,0,0,j,k] = np.sum(G_00pq3*old_state[:,j:,k:])
             G_00pq3 = G_00pq3[:,:-1]*sqrt[k+1:]
         G_00pq2 = sqrtT[j+1:]*G_00pq2[:-1,:]
 
@@ -613,20 +638,22 @@ def R_matrix2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, 
     for n in range(1,cutoff):
         for k in range(0,cutoff):
             for j in range(0,cutoff):
-                R[0,n,j,k] = mu[1]/sqrt[n]*R[0,n-1,j,k] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[0,n-2,j,k] - Sigma[1,2]/sqrt[n]*R[0,n-1,j+1,k] - Sigma[1,3]/sqrt[n]*R[0,n-1,j,k+1]
+                R[:,0,n,j,k] = mu[1]/sqrt[n]*R[:,0,n-1,j,k] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[:,0,n-2,j,k] - Sigma[1,2]/sqrt[n]*R[:,0,n-1,j+1,k] - Sigma[1,3]/sqrt[n]*R[:,0,n-1,j,k+1]
+#    for n in range(1,cutoff):
+#        R[:,0,n,:-1,:-1] = mu[1]/sqrt[n]*R[:,0,n-1,:-1,:-1] - Sigma[1,1]/sqrt[n]*sqrt[n-1]*R[:,0,n-2,:-1,:-1] - Sigma[1,2]/sqrt[n]*R[:,0,n-1,1:,:-1] - Sigma[1,3]/sqrt[n]*R[:,0,n-1,:-1,1:]
+
 
     #R_mn^jk
     for m in range(1,cutoff):
         for n in range(0,cutoff):
             for j in range(0,cutoff-m):
                 for k in range(0,cutoff-m-j):
-                    R[m,n,j,k] = mu[0]/sqrt[m]*R[m-1,n,j,k] - Sigma[0,0]/sqrt[m]*sqrt[m-1]*R[m-2,n,j,k] - Sigma[0,1]*sqrt[n]/sqrt[m]*R[m-1,n-1,j,k] - Sigma[0,2]/sqrt[m]*R[m-1,n,j+1,k] - Sigma[0,3]/sqrt[m]*R[m-1,n,j,k+1]
+                    R[:,m,n,j,k] = mu[0]/sqrt[m]*R[:,m-1,n,j,k] - Sigma[0,0]/sqrt[m]*sqrt[m-1]*R[:,m-2,n,j,k] - Sigma[0,1]*sqrt[n]/sqrt[m]*R[:,m-1,n-1,j,k] - Sigma[0,2]/sqrt[m]*R[:,m-1,n,j+1,k] - Sigma[0,3]/sqrt[m]*R[:,m-1,n,j,k+1]
           
     return R
 
 
-
-# @njit
+@njit
 def G_matrix(
     gamma: np.complex, phi: np.float, z: np.complex, cutoff: np.int, dtype: np.dtype = np.complex128
 ) -> np.array:
@@ -784,3 +811,136 @@ def approx_new_state(gamma, phi, z, old_state, order=None):
             )
 
     return R[:, 0]
+    
+@njit()
+def dPsi(gamma: np.complex, phi: np.float, z: np.complex, state_in: np.array, G0: np.array, R: np.array) -> list:
+
+    batch, cutoff = state_in.shape
+    dtype = state_in.dtype
+
+    z = convert_scalar(z)
+    phi = convert_scalar(phi)
+    gamma = convert_scalar(gamma)
+
+    C, mu, Sigma = C_mu_Sigma(gamma, phi, z)
+    dC, dmu, dSigma = dC_dmu_dSigma(gamma, phi, z)
+
+    sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
+    dR = np.zeros((batch, cutoff, cutoff, 5), dtype=dtype)
+    dG0 = np.zeros((cutoff, 5), dtype=dtype)
+
+    # first row of Transformation matrix
+    dG0[0] = dC
+    for n in range(1, cutoff):
+        dG0[n] = (
+              dmu[1] / sqrt[n] * G0[n - 1]
+            - dSigma[1, 1] * sqrt[n - 1] / sqrt[n] * G0[n - 2]
+            + mu[1] / sqrt[n] * dG0[n - 1]
+            - Sigma[1, 1] * sqrt[n - 1] / sqrt[n] * dG0[n - 2]
+        )
+
+    # first row of dR matrix
+    for n in range(cutoff):
+        dR[:, 0, n] = np.dot(state_in, dG0[: cutoff - n])
+        state_in = state_in[:, 1:] * sqrt[1 : cutoff - n]
+
+    # second row of dR matrix
+    dR[:, 1, :-1] = (
+        ed(R[:, 0, :-1], 2) * ed(ed(dmu[0], 0), 0)
+        - ed(R[:, 0, 1:], 2) * ed(ed(dSigma[0, 1], 0), 0)
+        + mu[0] * dR[:, 0, :-1]
+        - Sigma[0, 1] * dR[:, 0, 1:]
+    )
+    
+    # rest of dR matrix
+    for m in range(2, cutoff):
+        dR[:, m, :-m] = (
+            ed(R[:, m - 1, :-m], 2) * ed(ed(dmu[0], 0), 0)
+            - sqrt[m - 1] * ed(R[:, m - 2, :-m], 2) * ed(ed(dSigma[0, 0], 0), 0)
+            - ed(R[:, m - 1, 1 : -m + 1], 2) * ed(ed(dSigma[0, 1], 0), 0)
+            + mu[0] * dR[:, m - 1, :-m]
+            - Sigma[0, 0] * sqrt[m - 1] * dR[:, m - 2, :-m]
+            - Sigma[0, 1] * dR[:, m - 1, 1 : -m + 1]
+        ) / sqrt[m]
+    return list(np.transpose(dR[:, :, 0], (2, 0, 1)))
+
+@njit()
+def dPsi2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi, state_in, G00, R):
+    """
+    Computes the gradient of the new state with respect to
+    gamma, gamma*, phi, z, z* but not with respect to the old state
+
+    Arguments:
+        gamma1 (complex): displacement parameter1
+        gamma2 (complex): displacement parameter2
+        phi1 (float): phase rotation parameter1
+        phi2 (float): phase rotation parameter2
+        
+        theta1(float): transmissivity angle of the beamsplitter1
+        varphi1(float): reflection phase of the beamsplitter1
+        
+        zeta1 (complex): squeezing parameter1
+        zeta2 (complex): squeezing parameter2
+        
+        theta(float): transmissivity angle of the beamsplitter
+        varphi(float): reflection phase of the beamsplitter
+        
+        state_in: (complex array[bath,D,D]): old state
+        G00 (complex array[D,D]): G[0,0,:,:] of the G matrix
+        R (complex array[bath, D,D,D,D]): complete R matrix R[:,:,:,:] (!not really complete....)
+
+    Returns:
+        (complex array[batch, D, D, 14]): gradient of the new state with respect to
+                                    gamma1, gamma1*, gamma2, gamma2*, phi1, phi2, theta1, varphi1, zeta1, zeta1*, zeta2, zeta2*, theta, varphi
+    """
+    batch, cutoff, _ = state_in.shape
+    dtype = state_in.dtype
+    
+    C, mu, Sigma = C_mu_Sigma2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi)
+    dC, dmu, dSigma = dC_dmu_dSigma2(gamma1, gamma2, phi1, phi2, theta1, varphi1, zeta1, zeta2, theta, varphi)
+    
+    sqrt = np.sqrt(np.arange(cutoff, dtype=dtype))
+    sqrtT = sqrt.reshape(-1, 1)
+    
+    dR = np.zeros((batch, cutoff, cutoff, cutoff+1 , cutoff+1, 14),dtype = dtype)
+    dG00 = np.zeros((cutoff, cutoff, 14),dtype = dtype)
+    
+    dG00[0,0] = dC
+    for q in range(1, cutoff):
+        dG00[0,q] = (dmu[3]*G00[0,q-1]+mu[3]*dG00[0,q-1] - dSigma[3,3]*sqrt[q-1]*G00[0,q-2]- Sigma[3,3]*sqrt[q-1]*dG00[0,q-2])/sqrt[q]
+
+
+    for p in range(1,cutoff):
+        for q in range(0,cutoff):
+            dG00[p,q] = (dmu[2]*G00[p-1,q]+ mu[2]*dG00[p-1,q] - dSigma[2,2]*sqrt[p-1]*G00[p-2,q]- Sigma[2,2]*sqrt[p-1]*dG00[p-2,q] - dSigma[2,3]*sqrt[q]*G00[p-1,q-1]- Sigma[2,3]*sqrt[q]*dG00[p-1,q-1])/sqrt[p]
+                    
+    dG002 = dG00
+    for j in range(cutoff):
+        dG003 = dG002
+        for k in range(cutoff):
+        #dG003[D,D,14]*state_in[batch,D,D] - > we want [batch,14]
+            test = ed(dG003,0)*ed(state_in[:,j:,k:],-1)
+            dR[:,0,0,j,k] = test.sum(axis=1).sum(axis=1)
+            dG003 = dG003[:,:-1]*sqrtT[k+1:]
+        dG002 = ed(ed(sqrt[j+1:],1),1)*dG002[:-1,:]
+
+    for n in range(1,cutoff):
+        for k in range(0,cutoff):
+            for j in range(0,cutoff):
+            #dR[batch,D,D,D,D,14] R[batch,D,D,D,D] dmu[4,14] dSigma[4,4,14]
+            # dR[:,0,n,j,k] = [batch,14]
+#                 dR[:,0,n,j,k] = (dmu[1]*R[:,0,n-1,j,k] + ed(mu[1],0)*dR[:,0,n-1,j,k] - dSigma[1,1]*sqrt[n-1]*R[:,0,n-2,j,k] - Sigma[1,1]*sqrt[n-1]*dR[:,0,n-2,j,k] - dSigma[1,2]*R[:,0,n-1,j+1,k] - Sigma[1,2]*dR[:,0,n-1,j+1,k] - dSigma[1,3]*R[:,0,n-1,j,k+1] - Sigma[1,3]*dR[:,0,n-1,j,k+1]
+#                                 )/sqrt[n]
+                dR[:,0,n,j,k] = (ed(dmu[1],0)*ed(R[:,0,n-1,j,k],1)+ mu[1]*dR[:,0,n-1,j,k]-ed(dSigma[1,1],0)*sqrt[n-1]*ed(R[:,0,n-2,j,k],1)-Sigma[1,1]*sqrt[n-1]*dR[:,0,n-2,j,k] - ed(dSigma[1,2],0)*ed(R[:,0,n-1,j+1,k],1) - Sigma[1,2]*dR[:,0,n-1,j+1,k] -ed(dSigma[1,3],0)*ed(R[:,0,n-1,j,k+1],1) - Sigma[1,3]*dR[:,0,n-1,j,k+1])/sqrt[n]
+
+
+    for m in range(1,cutoff):
+        for n in range(0,cutoff):
+            for j in range(0,cutoff-m):
+                for k in range(0,cutoff-m-j):
+#                     dR[:,m,n,j,k] = (dmu[0]*R[m-1,n,j,k] + mu[0]*dR[:,m-1,n,j,k] - dSigma[0,0]*sqrt[m-1]*R[m-2,n,j,k] - Sigma[0,0]*sqrt[m-1]*dR[:,m-2,n,j,k] - dSigma[0,1]*sqrt[n]*R[m-1,n-1,j,k] - Sigma[0,1]*sqrt[n]*dR[:,m-1,n-1,j,k] - dSigma[0,2]*R[m-1,n,j+1,k] - Sigma[0,2]*dR[:,m-1,n,j+1,k] - dSigma[0,3]*R[m-1,n,j,k+1] - Sigma[0,3]*dR[:,m-1,n,j,k+1])/sqrt[m]
+                    dR[:,m,n,j,k] = (ed(dmu[0],0)*ed(R[:,m-1,n,j,k],1) + mu[0]*dR[:,m-1,n,j,k]  - ed(dSigma[0,0],0)*sqrt[m-1]*ed(R[:,m-2,n,j,k],1)  - Sigma[0,0]*sqrt[m-1]*dR[:,m-2,n,j,k]- ed(dSigma[0,1],0)*sqrt[n]*ed(R[:,m-1,n-1,j,k],1) - Sigma[0,1]*sqrt[n]*dR[:,m-1,n-1,j,k] - ed(dSigma[0,2],0)*ed(R[:,m-1,n,j+1,k],1) - Sigma[0,2]*dR[:,m-1,n,j+1,k]  - ed(dSigma[0,3],0)*ed(R[:,m-1,n,j,k+1],1)  - Sigma[0,3]*dR[:,m-1,n,j,k+1])/sqrt[m]
+    return list(np.transpose(dR[:,:,:,0,0,:],(3,0,1,2)))
+
+
+
