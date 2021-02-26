@@ -6,11 +6,11 @@ Warning: this library is still under heavy development.
 Look how easy it is to use:
 
     from poenta.circuit import Circuit
-    from poenta.nputils import single_photon,vaccum
+    from poenta.nputils import single_photon,vacuum
     import tensorflow as tf
 
     cutoff = 50
-    state_in = vaccum(1,cutoff)
+    state_in = vacuum(1,cutoff)
     target_out = single_photon(1,cutoff)
 
     device = Circuit(num_layers=10, num_modes=1, dtype=tf.complex128)
