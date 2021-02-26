@@ -50,9 +50,19 @@ def init_real(layers: int, scale: float = 0.01):
 
 ##############States###############
 
-def single_photon(cutoff):
-    state = np.zeros([cutoff])
-    state[1] = 1
+def vaccum(mode,cutoff):
+    if mode == 1:
+        state =np.zeros([cutoff])
+        state[0] = 1
+    return state
+
+def single_photon(mode,cutoff):
+    if mode == 1:
+        state = np.zeros([cutoff])
+        state[1] = 1
+    elif mode == 2:
+        state = np.zeros((cutoff,cutoff))
+        state[1,1] = 1
     return state
 
 
