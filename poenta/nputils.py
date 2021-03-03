@@ -50,7 +50,7 @@ def init_real(layers: int, scale: float = 0.01):
 
 ##############States###############
 
-def vaccum(mode,cutoff):
+def vacuum(mode,cutoff):
     if mode == 1:
         state =np.zeros([cutoff])
         state[0] = 1

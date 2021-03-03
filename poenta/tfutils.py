@@ -76,18 +76,19 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
     kappa = tf.convert_to_tensor(kappa)
     state_in = tf.convert_to_tensor(state_in)
     cutoff = state_in.shape[1]
+    batch = state_in.shape[0]
 
     dtype_c = state_in.dtype
     dtype_r = phi.dtype
 
+    
     R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
+    print("R size",R)
     gaussian_output = R[..., 0]
     
     Kerr = tf.exp(1j * tf.cast(kappa, dtype=dtype_c) * np.arange(cutoff) ** 2)
     state_out = Kerr * gaussian_output
-    
-    
-    
+ 
     #########
     G = tf.numpy_function(G_matrix, [gamma, phi, z, cutoff], dtype_c)
     dPsiG_dgamma, dPsiG_dgammac, dPsiG_dphi, dPsiG_dz, dPsiG_dzc = tf.numpy_function(
@@ -121,24 +122,32 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
         grad_z = tf.reduce_sum(dy * tf.math.conj(dPsi_dzc) + tf.math.conj(dy) * dPsi_dz)
         
         grad_Psic = tf.linalg.matvec(Kerr[:,None]*G, dy, adjoint_a=True)
-        
-        
-        ##TODO: G_C matrix [D,D,batch,5] if batch = 0
+
+        ##TODO: G_C matrix if batch != 0
         
         ########COMPLEX############
         if nat_grad:
-            c = 1
-            dPsi_dtheta = tf.convert_to_tensor([dPsi_dgamma[0], dPsi_dgammac[0], dPsi_dz[0], dPsi_dzc[0], c*dPsi_dphi[0], c*dPsi_dkappa[0]])
-            dPsi_dthetac = tf.convert_to_tensor([dPsi_dgammac[0], dPsi_dgamma[0], dPsi_dzc[0], dPsi_dz[0], c*dPsi_dphi[0], c*dPsi_dkappa[0]])
+            
+            for i in range(batch):
+            
+                dPsi_dtheta = tf.convert_to_tensor([dPsi_dgamma[i], dPsi_dgammac[i], dPsi_dz[i], dPsi_dzc[i], dPsi_dphi[i], dPsi_dkappa[i]])
+                dPsi_dthetac = tf.convert_to_tensor([dPsi_dgammac[i], dPsi_dgamma[i], dPsi_dzc[i], dPsi_dz[i], dPsi_dphi[i], dPsi_dkappa[i]])
 
-            invMetric = tf.numpy_function(inverse_metric, [dPsi_dtheta, dPsi_dthetac, state_out[0]], dtype_c)
+                invMetric = tf.numpy_function(inverse_metric, [dPsi_dtheta, dPsi_dthetac, state_out[i]], dtype_c)
 
-            updates = tf.convert_to_tensor([grad_gammac, tf.math.conj(grad_gammac), grad_zc, tf.math.conj(grad_zc),  tf.cast(grad_phi, dtype_c), tf.cast(grad_kappa, dtype_c)], dtype=dtype_c)
+                updates = tf.convert_to_tensor([grad_gammac, tf.math.conj(grad_gammac), grad_zc, tf.math.conj(grad_zc),  tf.cast(grad_phi, dtype_c), tf.cast(grad_kappa, dtype_c)], dtype=dtype_c)
 
-#            updates = tf.convert_to_tensor([tf.math.conj(grad_gammac), grad_gammac, tf.math.conj(grad_zc), grad_zc, tf.cast(grad_phi, dtype_c), tf.cast(grad_kappa, dtype_c)], dtype=dtype_c)
-
-            NG_updates = tf.linalg.matvec(invMetric, updates)
-            grad_gammac, grad_zc, grad_phi, grad_kappa = NG_updates[0], NG_updates[2], tf.math.real(NG_updates[4]), tf.math.real(NG_updates[5])
+                NG_updates = tf.linalg.matvec(invMetric, updates)
+                
+                if i == 0:
+                    grad_gammac, grad_zc, grad_phi, grad_kappa = NG_updates[0],NG_updates[2],tf.math.real(NG_updates[4]),tf.math.real(NG_updates[5])
+                else:
+                    grad_gammac = tf.stack([grad_gammac,NG_updates[0]])
+                    grad_zc = tf.stack([grad_zc,NG_updates[2]])
+                    grad_phi = tf.stack([grad_phi,tf.math.real(NG_updates[4])])
+                    grad_kappa = tf.stack([grad_kappa,tf.math.real(NG_updates[5])])
+                
+                
         ############################
 
 
