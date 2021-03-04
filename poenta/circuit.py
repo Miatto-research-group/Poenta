@@ -25,7 +25,7 @@ from .keras import QuantumCircuit, LossCallback, LearningRateScheduler, Progress
 
 
 class Circuit:
-    def __init__(self, num_layers: int, num_modes: int, num_seed: int = 665, dtype: tf.dtypes.DType):
+    def __init__(self, num_layers: int, num_modes: int, dtype: tf.dtypes.DType,  num_seed: int = 665):
         self.num_layers = num_layers
         self.num_modes = num_modes
         self.dtype = dtype
