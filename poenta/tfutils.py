@@ -83,7 +83,7 @@ def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, ka
 
     
     R = tf.numpy_function(R_matrix, [gamma, phi, z, state_in], dtype_c)
-    print("R size",R)
+#    print("R size",R)
     gaussian_output = R[..., 0]
     
     Kerr = tf.exp(1j * tf.cast(kappa, dtype=dtype_c) * np.arange(cutoff) ** 2)

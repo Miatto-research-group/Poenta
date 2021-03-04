@@ -50,10 +50,13 @@ def init_real(layers: int, scale: float = 0.01):
 
 ##############States###############
 
-def vacuum(mode,cutoff):
+def vaccum(mode,cutoff):
     if mode == 1:
         state =np.zeros([cutoff])
         state[0] = 1
+    elif mode == 2:
+        state = np.zeros((cutoff,cutoff), dtype=np.complex128)
+        state[0,0] = 1
     return state
 
 def single_photon(mode,cutoff):
@@ -111,7 +114,7 @@ def hex_GKP(mu, d, delta, cutoff, nmax=7):
     return hex_state/np.linalg.norm(hex_state)
 
 def NOON(N, cutoff):
-    state = np.zeros([cutoff, cutoff])
-    state[0, N] = 1
-    state[N, 0] = 1
-    return state.flatten()/np.linalg.norm(state)
+    state = np.zeros((cutoff, cutoff))
+    state[0, N] = 1/np.sqrt(2)
+    state[N, 0] = 1/np.sqrt(2)
+    return state
