@@ -108,7 +108,6 @@ class QuantumCircuit(tf.keras.Sequential):
                 [tf.keras.Input(shape=(cutoff,cutoff,), batch_size=batch_size, dtype=dtype)]
                 + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
             )
-
     def loss_fn(self, targets, states_out):
         return 1 - tf.abs(tf.reduce_sum(states_out * tf.math.conj(targets))/targets.shape[0]) ** 2
 
