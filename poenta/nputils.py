@@ -63,9 +63,6 @@ def single_photon(mode,cutoff):
     if mode == 1:
         state = np.zeros([cutoff])
         state[1] = 1
-    elif mode == 2:
-        state = np.zeros((cutoff,cutoff))
-        state[1,1] = 1
     return state
 
 

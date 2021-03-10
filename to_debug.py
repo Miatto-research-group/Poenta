@@ -1,16 +1,17 @@
-import numpy as np
-import tensorflow as tf
 from poenta.circuit import Circuit
-from poenta.nputils import single_photon,NOON,hex_GKP
-import matplotlib.pyplot as plt
+from poenta.nputils import vaccum,hex_GKP,single_photon
+import tensorflow as tf
+import numpy as np
 
-state_in = np.zeros(50, dtype=np.complex128)
-state_in[0] = 1
-# target_out = hex_GKP(mu=1, d=2, delta=0.3, cutoff=50, nmax=7)
-target_out = single_photon(50)
+cutoff = 10
+state_in = vaccum(1,cutoff)
+# target_out = hex_GKP(1, 2, 0.3, 100, nmax=7)
+target_out = single_photon(1,cutoff)
+target_out2 = vaccum(1,cutoff)
 
-device = Circuit(num_layers=8, num_modes=1, dtype=tf.complex128)
-tuple_in_out = (state_in,target_out),
+
+device = Circuit(num_layers=5, num_modes=1, dtype=tf.complex128)
+
+tuple_in_out = (state_in,target_out),(state_in,target_out2),
 device.set_input_output_pairs(*tuple_in_out)
-device.optimize(steps=1000, optimizer="SGD", learning_rate=0.001, scheduler = False, nat_grad = False)
-
+device.optimize(steps = 1000,optimizer = "SGD",learning_rate = 0.001,scheduler = False, nat_grad = True)

@@ -27,7 +27,7 @@ def convert_scalar(arr):
     else:
         return lambda arr: arr
         
-#@njit
+##@njit
 def inverse_metric(dpsi_dtheta, dpsi_dthetac, psi, diagonal=False):
     vec = np.dot(dpsi_dtheta, np.conj(psi))
     vecc = np.dot(dpsi_dthetac, np.conj(psi))
@@ -35,9 +35,34 @@ def inverse_metric(dpsi_dtheta, dpsi_dthetac, psi, diagonal=False):
     GCT = np.dot(dpsi_dthetac, np.conj(dpsi_dthetac).T) - np.outer(vecc, np.conj(vecc))
     mat = (GC+GCT)/2 + 0.001*np.identity(len(GC))
     inverse = np.linalg.solve(mat, np.identity(len(mat)).astype(psi.dtype)).astype(psi.dtype)
+    return inverse
+
+
+
+########TEST VERSION#######
+##@njit
+def inverse_metric_batch(dpsi_dtheta, dpsi_dthetac, psi, diagonal=False):
+    #dpsi_dtheta (6,batch,D)
+    #psi (batch,D)
+    #vec/vecc (batch,6)
+    batch,D = psi.shape
+    vec = np.einsum("ibk,bk->bi",dpsi_dtheta,np.conj(psi))
+    vecc = np.einsum("ibk,bk->bi",dpsi_dthetac,np.conj(psi))
+    #GC/GCT (batch,6,6)
+    GC = np.einsum("ibk,jbk->bij",np.conj(dpsi_dtheta), dpsi_dtheta) - np.einsum("bi,bj->bij",np.conj(vec), vec)
+    GCT = np.einsum("ibk,jbk->bij",dpsi_dthetac, np.conj(dpsi_dthetac)) - np.einsum("bi,bj->bij", vecc, np.conj(vecc))
+
+    iden = np.identity(dpsi_dtheta.shape[0]).astype(psi.dtype)
+    delta = np.repeat(iden[np.newaxis,:,:], batch, axis=0)
+
+    mat = (GC+GCT)/2 + 0.001*delta
+    inverse = np.linalg.solve(mat, delta).astype(psi.dtype)
 #    print('diagonal: ', np.round(abs(np.diag(inverse)), decimals=2))
     return inverse#np.diag(np.diag(inverse))
-
+    
+    
+    
+############################
 #@njit
 #def inverse_metric_real(dpsi_dtheta, psi):
 #    vec = np.dot(dpsi_dtheta, np.conj(psi))
