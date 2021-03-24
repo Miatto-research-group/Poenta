@@ -47,9 +47,12 @@ def inverse_metric_batch(dpsi_dtheta, dpsi_dthetac, psi, diagonal=False):
     #vec/vecc (batch,6)
     batch,D = psi.shape
     vec = np.einsum("ibk,bk->bi",dpsi_dtheta,np.conj(psi))
+#    vec = np.sum(dpsi_dtheta * np.conj(psi), axis=-1).T
     vecc = np.einsum("ibk,bk->bi",dpsi_dthetac,np.conj(psi))
+#    vecc = np.sum(dpsi_dthetac * np.conj(psi), axis=-1).T
     #GC/GCT (batch,6,6)
     GC = np.einsum("ibk,jbk->bij",np.conj(dpsi_dtheta), dpsi_dtheta) - np.einsum("bi,bj->bij",np.conj(vec), vec)
+#    GC = np.transpose(np.sum(np.dot(np.conj(dpsi_dtheta), np.transpose(dpsi_dtheta,(0,2,1))),axis=1),(2,0,1)) - np.transpose(np.sum(np.dot(np.conj(vec), vec),axis=1),(2,0,1))
     GCT = np.einsum("ibk,jbk->bij",dpsi_dthetac, np.conj(dpsi_dthetac)) - np.einsum("bi,bj->bij", vecc, np.conj(vecc))
 
     iden = np.identity(dpsi_dtheta.shape[0]).astype(psi.dtype)
