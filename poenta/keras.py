@@ -28,7 +28,7 @@ class QuantumLayer(tf.keras.layers.Layer):
         self.complextype = complextype
         self.nat_grad = False
 
-    def build(self, input_shape):  # TODO: upgrade for 2 modes
+    def build(self, input_shape):
         if self.num_modes == 1:
             self.gamma = self.add_weight(
                 "gamma", dtype=self.complextype, trainable=True, initializer=complex_initializer(self.complextype)
@@ -89,6 +89,31 @@ class QuantumLayer(tf.keras.layers.Layer):
             output = LayerTransformation2mode(self.gamma1, self.gamma2, self.phi1, self.phi2, self.theta1, self.varphi1, self.zeta1, self.zeta2, self.theta, self.varphi, self.kappa1, self.kappa2, input)
         output.set_shape(input.get_shape())
         return output
+        
+class QuantumLossyChannel(tf.keras.layers.Layer):
+    def __init__(self, num_modes: int, batch_size: int, cutoff: int):
+        """
+            Define a single mode quantum lossy channel by the Kraus operator of transmissivity \eta:
+            \sum_k A_k \rho A_k^{\dagger}
+            and
+            A_k = (1-\eta)^(k/2)/sqrt(k!)*(sqrt(\eta))^N a^k
+        """
+        self._batch_size = batch_size
+        self.cutoff = cutoff
+        self._eta = 0.90
+        
+    def build(self, input_shape):
+        super().build(input_shape)
+    
+    def call(self, input):
+        #TODO: BATCH! (= 0 for now
+        #TODO: \rho (pure state for now
+        #TODO: k = 1 (could only lose one photon
+        input0 = input[0]
+       
+        if num_modes == 1:
+            return 0
+        
 
 
 class QuantumCircuit(tf.keras.Sequential):

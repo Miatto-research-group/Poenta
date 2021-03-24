@@ -44,7 +44,20 @@ def init_real(layers: int, scale: float = 0.01):
     """
     return np.random.normal(scale=scale, size=layers)
 
-
+def A_k(eta, k, N, cutoff):
+    """
+        Return the Kraus operator A_k
+        
+        Arguments:
+            eta: transmissity of the channel
+            k: number of Kraus operator
+            N: photon Number
+            cutoff: cutoff of the optical mode
+    """
+    a = np.zeros((cutoff,cutoff))
+    for i in range(cutoff-1):
+        a[i,i+1] = np.sqrt(i+1)
+    return (1-eta)**(k/2)/np.sqrt(fac(k))*(np.sqrt(eta))**N*np.linalg.matrix_power(a,k)
 
 
 
