@@ -14,7 +14,7 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import tensorflow as tf
-from .tfutils import real_complex_types, complex_initializer, real_initializer, LayerTransformation, LayerTransformation2mode
+from .tfutils import real_complex_types, complex_initializer, real_initializer, LayerTransformation, LayerTransformation2mode, LossyChannelTransformation
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from numpy import pi, cos, tanh
 
@@ -91,16 +91,17 @@ class QuantumLayer(tf.keras.layers.Layer):
         return output
         
 class QuantumLossyChannel(tf.keras.layers.Layer):
-    def __init__(self, num_modes: int, batch_size: int, cutoff: int):
+    def __init__(self, num_modes: int, cutoff: int):
         """
             Define a single mode quantum lossy channel by the Kraus operator of transmissivity \eta:
             \sum_k A_k \rho A_k^{\dagger}
             and
             A_k = (1-\eta)^(k/2)/sqrt(k!)*(sqrt(\eta))^N a^k
         """
-        self._batch_size = batch_size
+        super().__init__()
         self.cutoff = cutoff
         self._eta = 0.90
+        self.num_modes = num_modes
         
     def build(self, input_shape):
         super().build(input_shape)
@@ -109,12 +110,10 @@ class QuantumLossyChannel(tf.keras.layers.Layer):
         #TODO: BATCH! (= 0 for now
         #TODO: \rho (pure state for now
         #TODO: k = 1 (could only lose one photon
-        input0 = input[0]
-       
-        if num_modes == 1:
-            return 0
-        
-
+#        input0 = input[0]
+        if self.num_modes == 1:
+            output = LossyChannelTransformation(input, self.cutoff)
+            return output
 
 class QuantumCircuit(tf.keras.Sequential):
     def __init__(self, num_modes: int, num_layers: int, batch_size: int, cutoff: int, dtype: tf.DType):
@@ -123,11 +122,18 @@ class QuantumCircuit(tf.keras.Sequential):
         self._batch_size = batch_size
         self._tot_batches = 0
         self.cutoff = cutoff
+#        if num_modes == 1:
+#            super().__init__(
+#                [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
+#                + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
+#            )
+###############
         if num_modes == 1:
             super().__init__(
                 [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
-                + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers)]
+                + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype)] + [QuantumLossyChannel(num_modes, cutoff)]  + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers-1)]
             )
+##############
         elif num_modes == 2:
             super().__init__(
                 [tf.keras.Input(shape=(cutoff,cutoff,), batch_size=batch_size, dtype=dtype)]

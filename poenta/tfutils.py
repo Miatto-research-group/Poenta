@@ -17,7 +17,7 @@ import tensorflow as tf
 import numpy as np
 
 from .jitted import G_matrix, G_matrix2,dPsi, R_matrix, dPsi2, R_matrix2, inverse_metric, inverse_metric_batch
-
+from .nputils import A_k
 
 def complex_initializer(dtype):
     f = tf.random_normal_initializer()
@@ -50,6 +50,9 @@ def real_complex_types(dtype: tf.dtypes.DType):
     else:
         raise ValueError(f"dtype can be only tf.complex128 or tf.complex64, not {dtype}")
     return realtype, complextype
+
+def LossyChannelTransformation(input, cutoff):
+    return tf.linalg.matvec(A_k(eta = 0.9, k = 1, cutoff = cutoff),input)
 
 
 @tf.custom_gradient
