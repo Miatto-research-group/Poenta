@@ -51,9 +51,24 @@ def real_complex_types(dtype: tf.dtypes.DType):
         raise ValueError(f"dtype can be only tf.complex128 or tf.complex64, not {dtype}")
     return realtype, complextype
 
-def LossyChannelTransformation(input, cutoff):
-    return tf.linalg.matvec(A_k(eta = 0.9, k = 1, cutoff = cutoff),input)
-
+def LossyChannelTransformation(state_in):
+    """
+    Evolution of a single-mode quantum lossy channel parametrized by:
+    eta: transmissity;
+    k: number of photon loss;
+    cutoff: cutoff of the Fock state.
+    
+    Arguments:
+    state_in (complex array[batch,D]): input state of dimension D
+    
+    Returns:
+    state_out (complex array[batch,D]): output state of dimension D
+    
+    """
+    cutoff = state_in.shape[1]
+    A_0 =  A_k(eta = 0.9, k = 0, cutoff = cutoff)
+    A_1 =  A_k(eta = 0.9, k = 1, cutoff = cutoff)
+    return tf.reshape(tf.linalg.matvec(A_0,tf.reshape(state_in,[cutoff,])) + tf.linalg.matvec(A_1,tf.reshape(state_in,[cutoff,])),[1,cutoff])
 
 @tf.custom_gradient
 def LayerTransformation(gamma: tf.Variable, phi: tf.Variable, z: tf.Variable, kappa: tf.Variable, state_in: tf.Tensor, nat_grad: bool = False) -> tf.Tensor:

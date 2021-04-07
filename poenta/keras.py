@@ -106,13 +106,13 @@ class QuantumLossyChannel(tf.keras.layers.Layer):
     def build(self, input_shape):
         super().build(input_shape)
     
-    def call(self, input):
+    def call(self, state_in):
         #TODO: BATCH! (= 0 for now
         #TODO: \rho (pure state for now
         #TODO: k = 1 (could only lose one photon
 #        input0 = input[0]
         if self.num_modes == 1:
-            output = LossyChannelTransformation(input, self.cutoff)
+            output = LossyChannelTransformation(state_in)
             return output
 
 class QuantumCircuit(tf.keras.Sequential):
@@ -131,7 +131,7 @@ class QuantumCircuit(tf.keras.Sequential):
         if num_modes == 1:
             super().__init__(
                 [tf.keras.Input(shape=[cutoff], batch_size=batch_size, dtype=dtype)]
-                + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype)] + [QuantumLossyChannel(num_modes, cutoff)]  + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(num_layers-1)]
+                + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(int(num_layers/2))] + [QuantumLossyChannel(num_modes, cutoff)]  + [QuantumLayer(num_modes, cutoff, self.realtype, self.complextype) for _ in range(int(num_layers/2))]
             )
 ##############
         elif num_modes == 2:
