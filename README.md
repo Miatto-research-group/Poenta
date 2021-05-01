@@ -15,8 +15,7 @@ target_out = single_photon(1,cutoff)
 
 device = Circuit(num_layers=10, num_modes=1, dtype=tf.complex128)
 
-tuple_in_out = (state_in,target_out),
-device.set_input_output_pairs(*tuple_in_out)
+device.set_input_output_pairs(state_in,target_out)
 device.optimize(steps = 500,optimizer = "SGD",learning_rate = 0.001,scheduler = True, nat_grad = False)
 ```
 
