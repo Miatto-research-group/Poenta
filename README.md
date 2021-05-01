@@ -4,7 +4,7 @@ Poenta is an open source library for the automated design of quantum optical dev
 Warning: this library is still under heavy development.
 
 Look how easy it is to use:
-
+```python
     from poenta.circuit import Circuit
     from poenta.nputils import single_photon,vacuum
     import tensorflow as tf
@@ -18,7 +18,7 @@ Look how easy it is to use:
     tuple_in_out = (state_in,target_out),
     device.set_input_output_pairs(*tuple_in_out)
     device.optimize(steps = 500,optimizer = "SGD",learning_rate = 0.001,scheduler = True, nat_grad = False)
-
+```
 
 Features
 --------
